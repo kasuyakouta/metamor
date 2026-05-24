@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
+<title>メタモル</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --glass:rgba(20,80,40,0.15);
+  --border:rgba(52,211,153,0.12);
+  --shadow:0 8px 32px rgba(0,0,0,0.35);
+  --accent:#34d399;
+  --text:rgba(255,255,255,0.92);
+  --dim:rgba(255,255,255,0.45);
+  --danger:#f87171;
+  --ok:#34d399;
+  --dock-bg:rgba(5,14,10,0.75);
+  --panel-bg:rgba(4,12,8,0.96);
+}
+html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased}
+
+/* ── BG ── */
+#bg{position:fixed;inset:0;z-index:0;background:#000}
+
+
+
+/* ── LAYOUT ── */
+#app{position:relative;z-index:1;height:100dvh;display:flex;flex-direction:column}
+
+/* ── 管理者バー（iOSの「完了」バー） ── */
+#admin-bar{
+  display:none;flex-shrink:0;
+  align-items:center;justify-content:space-between;
+  padding:10px 18px;
+  background:rgba(52,211,153,.1);
+  border-bottom:1px solid rgba(52,211,153,.22);
+  backdrop-filter:blur(12px);
+  animation:slideDown .25s ease;
+}
+@keyframes slideDown{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:none}}
+#admin-bar.show{display:flex}
+#admin-bar-label{
+  display:flex;align-items:center;gap:7px;
+  font-size:.72rem;font-weight:700;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--accent);
+}
+.admin-bar-dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 0 8px rgba(52,211,153,.7);
+  animation:pulse 2s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+#btn-done{
+  padding:6px 18px;border-radius:20px;
+  background:var(--accent);color:#06120a;
+  border:none;font-size:.82rem;font-weight:700;
+  cursor:pointer;letter-spacing:.02em;font-family:inherit;
+  transition:background .15s,transform .1s;
+}
+#btn-done:active{transform:scale(.95)}
+
+/* ── GRID ── */
+#grid-wrap{flex:1;overflow-y:auto;padding:10px 16px 80px;-webkit-overflow-scrolling:touch}
+#icon-grid.admin-active{padding-bottom:80px}
+#grid-wrap::-webkit-scrollbar{width:3px}
+#grid-wrap::-webkit-scrollbar-thumb{background:rgba(52,211,153,.15);border-radius:3px}
+#icon-grid{display:grid;grid-template-columns:repeat(4,1fr);column-gap:14px;row-gap:22px;user-select:none;-webkit-user-select:none}
+#icon-grid.dragging-active{touch-action:none}
+
+/* ── SLOT ── */
+.slot{display:flex;flex-direction:column;align-items:center;position:relative;min-height:82px}
+.slot-empty{
+  width:60px;height:60px;border-radius:13.5px;
+  border:1.5px dashed transparent;
+  transition:border-color .2s,background .2s,transform .15s;
+}
+.admin-mode .slot-empty{
+  border-color:rgba(52,211,153,.2);
+  background:rgba(52,211,153,.03);
+  cursor:pointer;
+}
+.admin-mode .slot:hover .slot-empty{
+  border-color:rgba(52,211,153,.5);
+  background:rgba(52,211,153,.08);
+  transform:scale(1.05);
+}
+/* ドラッグ受け入れ：パルス */
+.slot.drag-accept .slot-empty{
+  border-color:rgba(52,211,153,.9);
+  background:rgba(52,211,153,.15);
+  animation:slotPulse .7s ease infinite;
+}
+@keyframes slotPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.4)}
+  50%{box-shadow:0 0 0 6px rgba(52,211,153,0)}
+}
+/* ドラッグ拒否 */
+.slot.drag-reject .icon-visual{
+  box-shadow:0 0 0 2px rgba(248,113,113,.6)!important;
+  border-color:rgba(248,113,113,.5)!important;
+}
+
+/* ── ICON CARD ── */
+.icon-card{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  cursor:pointer;position:relative;width:100%;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:auto;
+}
+.icon-visual{
+  width:60px;height:60px;border-radius:13.5px;
+  display:flex;align-items:center;justify-content:center;font-size:1.65rem;
+  background:var(--glass);border:1px solid var(--border);
+  backdrop-filter:blur(16px);box-shadow:var(--shadow);
+  transition:transform .15s,box-shadow .15s,border-color .15s,opacity .15s;
+  position:relative;overflow:hidden;flex-shrink:0;
+}
+.icon-visual::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.1) 0%,transparent 55%);pointer-events:none}
+.icon-visual img{width:36px;height:36px;object-fit:contain;border-radius:8px}
+.icon-initial{font-size:1.4rem;font-weight:700;color:#fff}
+.icon-card:not(.dragging):hover .icon-visual{transform:scale(1.08) translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.45),0 0 0 1px rgba(52,211,153,.2)}
+.icon-card:not(.dragging):active .icon-visual{transform:scale(.92)}
+.icon-label{font-size:11px;font-weight:400;color:var(--text);text-align:center;text-shadow:0 1px 4px rgba(0,0,0,.7);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;max-width:72px;line-height:1.2}
+
+/* 長押し開始アニメーション */
+.slot.long-press-active .icon-visual{
+  transform:scale(1.12)!important;
+  box-shadow:0 0 0 3px rgba(52,211,153,.7),0 14px 36px rgba(0,0,0,.45)!important;
+  border-color:rgba(52,211,153,.6)!important;
+}
+
+/* 管理者アイコン */
+.icon-card.is-admin-icon .icon-visual{border-color:rgba(52,211,153,.3);box-shadow:var(--shadow),0 0 14px rgba(52,211,153,.15)}
+.icon-card.is-admin-icon:hover .icon-visual{border-color:rgba(52,211,153,.6);box-shadow:0 14px 36px rgba(0,0,0,.4),0 0 20px rgba(52,211,153,.25)}
+
+/* 削除バッジ */
+.del-badge{
+  position:absolute;top:-7px;right:calc(50% - 37px);
+  width:22px;height:22px;background:var(--danger);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:700;color:#fff;cursor:pointer;z-index:10;
+  opacity:0;pointer-events:none;transition:opacity .2s;
+  box-shadow:0 2px 8px rgba(0,0,0,.4);
+}
+.admin-mode .icon-card:not(.is-admin-icon) .del-badge{opacity:1;pointer-events:auto}
+
+/* ウィグル */
+.admin-mode .icon-card:not(.dragging){animation:wiggle .55s ease infinite alternate}
+.admin-mode .icon-card.dragging,.admin-mode .slot.long-press-active .icon-card{animation:none!important}
+@keyframes wiggle{from{transform:rotate(-.9deg)}to{transform:rotate(.9deg)}}
+.admin-mode .icon-card:hover{animation:none}
+
+/* ドラッグ元 */
+.slot.is-drag-src .icon-card .icon-visual{opacity:.22}
+.slot.is-drag-src .icon-card .icon-label{opacity:.22}
+
+/* ── ゴースト ── */
+#drag-ghost{
+  position:fixed;z-index:9999;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  opacity:.92;will-change:left,top;
+}
+#drag-ghost .icon-visual{
+  width:60px;height:60px;border-radius:13.5px;
+  display:flex;align-items:center;justify-content:center;font-size:1.65rem;
+  transform:scale(1.16);
+  box-shadow:0 20px 50px rgba(0,0,0,.6),0 0 0 2px rgba(52,211,153,.6);
+  border:1px solid rgba(52,211,153,.5);
+  backdrop-filter:blur(16px);
+  position:relative;overflow:hidden;
+}
+#drag-ghost .icon-visual::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.12) 0%,transparent 55%)}
+#drag-ghost .icon-label{font-size:11px;color:var(--text);text-align:center;text-shadow:0 1px 4px rgba(0,0,0,.8);white-space:nowrap;max-width:72px;overflow:hidden;text-overflow:ellipsis}
+
+/* ── DOCK ── */
+/* ── タブバー（B案・フル幅）── */
+#tabbar{
+  position:fixed;
+  bottom:0;left:0;right:0;
+  z-index:10;
+  display:flex;align-items:stretch;
+  background:rgba(4,12,8,.92);
+  border-top:1px solid rgba(52,211,153,.22);
+  backdrop-filter:blur(28px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  box-shadow:0 -4px 24px rgba(0,0,0,.4);
+  /* 通常モード：非表示 */
+  opacity:0;pointer-events:none;
+  transform:translateY(100%);
+  transition:opacity .3s,transform .3s cubic-bezier(.32,0,.18,1);
+}
+#tabbar.admin-mode{
+  opacity:1;pointer-events:auto;transform:translateY(0);
+}
+.tab-item{
+  flex:1;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:4px;
+  padding:10px 4px 10px;
+  cursor:pointer;
+  border:none;background:transparent;
+  color:rgba(52,211,153,.45);
+  transition:color .15s,background .15s;
+  outline:none;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+  position:relative;
+}
+.tab-item::before{
+  content:'';
+  position:absolute;top:0;left:8px;right:8px;height:2px;
+  background:var(--accent);border-radius:0 0 2px 2px;
+  opacity:0;transition:opacity .2s;
+}
+.tab-item:hover{color:rgba(52,211,153,.75);background:rgba(52,211,153,.05)}
+.tab-item:active{background:rgba(52,211,153,.1)}
+.tab-item.tab-active{color:var(--accent)}
+.tab-item.tab-active::before{opacity:1}
+.tab-item.tab-done{color:rgba(52,211,153,.7)}
+.tab-icon{
+  width:26px;height:26px;
+  display:flex;align-items:center;justify-content:center;
+}
+.tab-label{font-size:.62rem;font-weight:600;letter-spacing:.04em;white-space:nowrap}
+/* 完了ボタンは右端・強調 */
+.tab-item.tab-done{
+  color:#06120a;
+  background:rgba(52,211,153,.18);
+  border-left:1px solid rgba(52,211,153,.15);
+}
+.tab-item.tab-done:hover{background:rgba(52,211,153,.26)}
+.tab-item.tab-done .tab-label{color:#06120a}
+.tab-item.tab-done .tab-icon svg{stroke:#06120a}
+
+/* ── OVERLAY & PANEL ── */
+#overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.55);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .3s}
+#overlay.open{opacity:1;pointer-events:auto}
+#panel{
+  position:fixed;right:0;top:0;bottom:0;width:min(370px,100vw);
+  background:var(--panel-bg);border-left:1px solid rgba(52,211,153,.18);
+  backdrop-filter:blur(32px);z-index:51;
+  transform:translateX(100%);transition:transform .35s cubic-bezier(.32,0,.18,1);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#panel.open{transform:translateX(0)}
+#ph{padding:20px 20px 14px;border-bottom:1px solid rgba(52,211,153,.1);flex-shrink:0}
+#ph h2{font-size:1.05rem;font-weight:600;letter-spacing:-.01em}
+#ph p{font-size:.74rem;color:var(--dim);margin-top:3px}
+.abadge{display:inline-flex;align-items:center;gap:4px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.28);border-radius:50px;padding:2px 10px;font-size:.62rem;font-weight:700;letter-spacing:.07em;color:var(--accent);text-transform:uppercase;margin-bottom:8px}
+#pb{flex:1;overflow-y:auto;padding:16px 20px;overscroll-behavior:contain}
+#pb::-webkit-scrollbar{width:3px}
+#pb::-webkit-scrollbar-thumb{background:rgba(52,211,153,.12);border-radius:3px}
+
+/* ── FORM ── */
+.fg{margin-bottom:13px}
+.fg label{display:block;font-size:.67rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(52,211,153,.5);margin-bottom:5px}
+.fg input,.fg select{width:100%;padding:10px 12px;background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.15);border-radius:10px;color:var(--text);font-size:.87rem;outline:none;transition:border-color .2s,background .2s;font-family:inherit;-webkit-appearance:none;appearance:none}
+.fg input::placeholder{color:rgba(255,255,255,.2)}
+.fg input:focus,.fg select:focus{border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.08)}
+.fg select option{background:#071410;color:var(--text)}
+.swatches{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
+.sw{width:30px;height:30px;border-radius:8px;cursor:pointer;border:2px solid transparent;transition:transform .15s,border-color .15s}
+.sw:hover{transform:scale(1.15)}
+.sw.sel{border-color:#fff;transform:scale(1.1)}
+.btn-p{width:100%;padding:12px;background:rgba(52,211,153,.18);color:var(--accent);border:1px solid rgba(52,211,153,.3);border-radius:12px;font-size:.88rem;font-weight:600;cursor:pointer;transition:background .2s,transform .15s;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:5px;font-family:inherit}
+.btn-p:hover{background:rgba(52,211,153,.28);box-shadow:0 4px 14px rgba(52,211,153,.15)}
+.btn-p:active{transform:scale(.98)}
+.btn-p:disabled{opacity:.5;pointer-events:none}
+.btn-danger{width:100%;padding:12px;background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.25);border-radius:12px;font-size:.88rem;font-weight:600;cursor:pointer;transition:background .2s;display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px;font-family:inherit}
+.btn-danger:hover{background:rgba(248,113,113,.22)}
+.sttl{font-size:.67rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(52,211,153,.45);margin:18px 0 6px}
+.sttl-sub{font-size:.7rem;color:rgba(52,211,153,.35);margin-bottom:8px;line-height:1.55}
+.hr{height:1px;background:rgba(52,211,153,.1);margin:16px 0}
+
+/* プレビュー */
+#iprev{display:flex;align-items:center;gap:13px;background:rgba(52,211,153,.04);border:1px solid rgba(52,211,153,.1);border-radius:12px;padding:11px 13px;margin-bottom:13px}
+#picon{width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex-shrink:0;border:1px solid rgba(52,211,153,.1)}
+#pname{font-size:.87rem;font-weight:500}
+#purl{font-size:.67rem;color:var(--dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px;font-family:monospace}
+
+/* スロットミニグリッド */
+#slot-mini-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:4px}
+.slot-cell{
+  aspect-ratio:1;border-radius:8px;cursor:pointer;
+  border:1px solid rgba(52,211,153,.15);background:rgba(52,211,153,.04);
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;
+  transition:border-color .15s,background .15s,transform .1s;position:relative;overflow:hidden;
+}
+.slot-cell.occupied{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.18);cursor:not-allowed}
+.slot-cell.occupied::after{content:'';position:absolute;inset:0;background:rgba(0,0,0,.2)}
+.slot-cell:not(.occupied):hover{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.12);transform:scale(1.06)}
+.slot-cell.selected{border-color:var(--accent)!important;background:rgba(52,211,153,.22)!important;box-shadow:0 0 0 2px rgba(52,211,153,.35)}
+
+/* 壁紙 */
+#wgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.wth{aspect-ratio:16/9;border-radius:8px;background-size:cover;background-position:center;cursor:pointer;border:2px solid transparent;transition:border-color .2s,transform .15s}
+.wth:hover{transform:scale(1.04)}
+.wth.act{border-color:var(--accent)}
+
+/* 設定行 */
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(52,211,153,.07)}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-size:.84rem;font-weight:500}
+.setting-sub{font-size:.7rem;color:var(--dim);margin-top:2px}
+.setting-val{font-size:.72rem;color:rgba(52,211,153,.6);font-family:monospace;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right}
+.chip{
+  display:inline-flex;align-items:center;
+  background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);
+  border-radius:6px;padding:3px 10px;
+  font-size:.72rem;color:var(--accent);cursor:pointer;
+  transition:background .15s;white-space:nowrap;
+}
+.chip:hover{background:rgba(52,211,153,.2)}
+.chip.danger{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.25);color:var(--danger)}
+.chip.danger:hover{background:rgba(248,113,113,.2)}
+
+/* GAS ステータス */
+#gas-status{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;margin-bottom:10px;font-size:.76rem}
+#gas-status.connected{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25);color:var(--ok)}
+#gas-status.disconnected{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.2);color:var(--danger)}
+#gas-status.unknown{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:var(--dim)}
+
+/* TOAST */
+#toast{position:fixed;bottom:max(100px,calc(env(safe-area-inset-bottom)+90px));left:50%;transform:translateX(-50%) translateY(20px);background:rgba(4,12,8,.96);border:1px solid rgba(52,211,153,.2);backdrop-filter:blur(18px);border-radius:50px;padding:9px 20px;font-size:.83rem;color:var(--text);z-index:200;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;white-space:nowrap;max-width:90vw;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:rgba(52,211,153,.5);color:var(--ok)}
+#toast.err{border-color:rgba(248,113,113,.4);color:var(--danger)}
+
+/* PIN MODAL */
+#pw-modal{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .25s}
+#pw-modal.open{opacity:1;pointer-events:auto}
+#pw-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(8px)}
+#pw-box{position:relative;z-index:1;background:var(--panel-bg);border:1px solid rgba(52,211,153,.25);border-radius:24px;padding:28px 24px;width:min(300px,90vw);box-shadow:0 24px 64px rgba(0,0,0,.6);display:flex;flex-direction:column;align-items:center;animation:scaleIn .22s ease both}
+@keyframes scaleIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+#pw-icon-wrap{width:58px;height:58px;border-radius:16px;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin-bottom:14px}
+#pw-title{font-size:.98rem;font-weight:700;margin-bottom:2px}
+#pw-sub{font-size:.72rem;color:var(--dim);margin-bottom:18px;text-align:center;line-height:1.5}
+#pin-display{display:flex;gap:12px;margin-bottom:18px;justify-content:center}
+.pin-dot{width:13px;height:13px;border-radius:50%;border:2px solid rgba(52,211,153,.25);background:transparent;transition:background .15s,border-color .15s,transform .15s}
+.pin-dot.filled{background:var(--accent);border-color:var(--accent);transform:scale(1.2);box-shadow:0 0 8px rgba(52,211,153,.4)}
+.pin-dot.error{background:var(--danger);border-color:var(--danger);transform:scale(1)}
+#numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.num-btn{height:54px;border-radius:12px;border:1px solid rgba(52,211,153,.12);background:rgba(52,211,153,.06);color:var(--text);font-size:1.22rem;font-weight:500;cursor:pointer;transition:background .12s,transform .1s;display:flex;align-items:center;justify-content:center;font-family:inherit;-webkit-tap-highlight-color:transparent}
+.num-btn:active{transform:scale(.92);background:rgba(52,211,153,.2)}
+.num-btn.del-btn{font-size:1rem;color:rgba(52,211,153,.5)}
+.num-btn.cancel-btn{font-size:.72rem;color:rgba(255,255,255,.3)}
+#pw-error{font-size:.72rem;color:var(--danger);margin-top:10px;min-height:1em;text-align:center}
+
+@media(max-width:390px){
+  #icon-grid{column-gap:12px;row-gap:20px}
+  #grid-wrap{padding:8px 14px 100px}
+}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<div id="app">
+  <!-- 管理者バー -->
+  <div id="admin-bar">
+    <div id="admin-bar-label">
+      <div class="admin-bar-dot"></div>
+      編集モード
+    </div>
+    <button id="btn-done" onclick="exitAdmin()">完了</button>
+  </div>
+  <div id="grid-wrap">
+    <div id="icon-grid"></div>
+  </div>
+</div>
+
+<!-- タブバー（B案） -->
+<div id="tabbar">
+  <button class="tab-item" onclick="syncFromGAS()">
+    <div class="tab-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+    </div>
+    <div class="tab-label">更新</div>
+  </button>
+  <button class="tab-item" onclick="openPanel('wallpaper')">
+    <div class="tab-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+    </div>
+    <div class="tab-label">壁紙</div>
+  </button>
+  <button class="tab-item" onclick="openPanel('settings')">
+    <div class="tab-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </div>
+    <div class="tab-label">設定</div>
+  </button>
+  <button class="tab-item tab-done" onclick="exitAdmin()">
+    <div class="tab-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>
+    <div class="tab-label">完了</div>
+  </button>
+</div>
+
+<div id="toast"></div>
+<div id="overlay" onclick="overlayClick(event)"></div>
+
+<!-- スライドパネル -->
+<div id="panel">
+  <div id="ph">
+    <div class="abadge" id="panel-badge">◈ Admin</div>
+    <h2 id="ptitle">パネル</h2>
+    <p id="pdesc">説明</p>
+  </div>
+  <div id="pb"></div>
+</div>
+
+<!-- PINモーダル -->
+<div id="pw-modal">
+  <div id="pw-backdrop" onclick="closePwModal()"></div>
+  <div id="pw-box">
+    <div id="pw-icon-wrap">🔐</div>
+    <div id="pw-title">管理者パスワード</div>
+    <div id="pw-sub">4桁のPINを入力してください</div>
+    <div id="pin-display">
+      <div class="pin-dot" id="dot0"></div><div class="pin-dot" id="dot1"></div>
+      <div class="pin-dot" id="dot2"></div><div class="pin-dot" id="dot3"></div>
+    </div>
+    <div id="numpad">
+      <button class="num-btn" onclick="pinInput('1')">1</button>
+      <button class="num-btn" onclick="pinInput('2')">2</button>
+      <button class="num-btn" onclick="pinInput('3')">3</button>
+      <button class="num-btn" onclick="pinInput('4')">4</button>
+      <button class="num-btn" onclick="pinInput('5')">5</button>
+      <button class="num-btn" onclick="pinInput('6')">6</button>
+      <button class="num-btn" onclick="pinInput('7')">7</button>
+      <button class="num-btn" onclick="pinInput('8')">8</button>
+      <button class="num-btn" onclick="pinInput('9')">9</button>
+      <button class="num-btn cancel-btn" onclick="closePwModal()">キャンセル</button>
+      <button class="num-btn" onclick="pinInput('0')">0</button>
+      <button class="num-btn del-btn" onclick="pinDelete()">⌫</button>
+    </div>
+    <div id="pw-error"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  ① セキュアストレージラッパー（localStorage障害対応）
+// ═══════════════════════════════════════════════════════
+const SS = {
+  get(k, def=null){ try{ const v=localStorage.getItem(k); return v!==null?v:def; }catch{ return def; } },
+  set(k, v){       try{ localStorage.setItem(k,v); return true; }catch{ return false; } },
+  del(k){          try{ localStorage.removeItem(k); return true; }catch{ return false; } },
+  getObj(k, def=null){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):def; }catch{ return def; } },
+  setObj(k, v){    try{ localStorage.setItem(k,JSON.stringify(v)); return true; }catch{ return false; } },
+};
+
+// ═══════════════════════════════════════════════════════
+//  ② SHA-256 ハッシュユーティリティ（フォールバック付き）
+// ═══════════════════════════════════════════════════════
+const PIN_SALT = 'ml_launcher_s2';
+let cryptoAvailable = false;
+
+// ウィークハッシュ（crypto.subtle 非対応環境用フォールバック）
+function weakHash(str){
+  let h = 5381;
+  for(let i=0;i<str.length;i++) h = ((h<<5)+h) ^ str.charCodeAt(i);
+  return 'wh_' + (h >>> 0).toString(16).padStart(8,'0') + '_' + str.length;
+}
+
+async function sha256(str){
+  try{
+    if(!crypto?.subtle) throw new Error('unavailable');
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  }catch{
+    return weakHash(str); // フォールバック
+  }
+}
+async function hashPin(pin){
+  if(cryptoAvailable){
+    return sha256(pin + PIN_SALT);
+  }
+  // フォールバック時はweakHashを使用
+  return weakHash(pin + PIN_SALT);
+}
+
+// PINハッシュ（initSecurity()で初期化）
+let ADMIN_PIN_HASH = '';
+let GAS_URL        = SS.get('ml_gas', '');
+const TOTAL_SLOTS  = 24;
+const ADMIN_ENTRY  = {id:'__admin__',name:'管理者',url:'',icon:'⚙️',color:'rgba(10,30,20,0.75)',isAdmin:true};
+
+// ③ ブルートフォース保護
+const BF = {
+  KEY_COUNT : 'ml_bf_count',
+  KEY_LOCK  : 'ml_bf_lock',
+  MAX_TRIES : 5,
+  LOCK_MS   : 30_000,   // 30秒
+  count(){ return parseInt(SS.get(this.KEY_COUNT,'0'))||0; },
+  lockUntil(){ return parseInt(SS.get(this.KEY_LOCK,'0'))||0; },
+  isLocked(){ return Date.now() < this.lockUntil(); },
+  remaining(){ return Math.ceil((this.lockUntil()-Date.now())/1000); },
+  onFail(){
+    const c = this.count() + 1;
+    SS.set(this.KEY_COUNT, c);
+    if(c >= this.MAX_TRIES){
+      SS.set(this.KEY_LOCK, Date.now() + this.LOCK_MS);
+      SS.set(this.KEY_COUNT, '0');
+      return { locked:true, remaining: this.LOCK_MS/1000 };
+    }
+    return { locked:false, left: this.MAX_TRIES - c };
+  },
+  onSuccess(){ SS.set(this.KEY_COUNT,'0'); SS.del(this.KEY_LOCK); },
+};
+
+// ⑨ セッションタイムアウト（10分）
+const SESSION = {
+  TIMEOUT: 10 * 60 * 1000,
+  _t: null,
+  reset(){
+    clearTimeout(this._t);
+    if(isAdmin) this._t = setTimeout(()=>{
+      exitAdmin();
+      toast('🔒 10分間操作がなかったため自動ログアウトしました');
+    }, this.TIMEOUT);
+  },
+  clear(){ clearTimeout(this._t); this._t=null; },
+};
+
+// ⑥⑧ URLホワイトリストバリデーター
+function isSafeUrl(url){
+  if(!url || typeof url !== 'string') return false;
+  try{
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  }catch{ return false; }
+}
+function isValidGasUrl(url){
+  if(!url) return false;
+  try{
+    const u = new URL(url);
+    return u.protocol === 'https:' && u.hostname.endsWith('.google.com');
+  }catch{ return false; }
+}
+
+// ⑤ GASレスポンス個別エントリ検証
+function validateEntry(e){
+  if(!e || typeof e !== 'object') return false;
+  if(typeof e.id   !== 'string' || !e.id)  return false;
+  if(typeof e.name !== 'string' || !e.name || e.name.length > 50) return false;
+  if(!isSafeUrl(e.url)) return false;
+  if(e.icon   !== undefined && typeof e.icon   !== 'string') return false;
+  if(e.color  !== undefined && typeof e.color  !== 'string') return false;
+  return true;
+}
+
+// ═══════════════════════════════════════════════════════
+//  定数・デモデータ
+// ═══════════════════════════════════════════════════════
+const DEMO=[
+  {id:'d1',name:'Google',  url:'https://google.com',          icon:'🔍',color:'rgba(234,67,53,0.5)'},
+  {id:'d2',name:'YouTube', url:'https://youtube.com',         icon:'▶️', color:'rgba(200,0,0,0.48)'},
+  {id:'d3',name:'Drive',   url:'https://drive.google.com',    icon:'📂',color:'rgba(16,185,129,0.45)'},
+  {id:'d4',name:'Gmail',   url:'https://gmail.com',           icon:'✉️', color:'rgba(234,67,53,0.48)'},
+  {id:'d5',name:'Calendar',url:'https://calendar.google.com', icon:'📅',color:'rgba(14,165,233,0.48)'},
+  {id:'d6',name:'Slack',   url:'https://slack.com',           icon:'💬',color:'rgba(168,85,247,0.48)'},
+  {id:'d7',name:'Notion',  url:'https://notion.so',           icon:'📓',color:'rgba(255,255,255,0.08)'},
+  {id:'d8',name:'GitHub',  url:'https://github.com',          icon:'🐙',color:'rgba(20,30,60,0.65)'},
+  {id:'d9',name:'Figma',   url:'https://figma.com',           icon:'🎨',color:'rgba(236,72,153,0.48)'},
+  {id:'d10',name:'ChatGPT',url:'https://chatgpt.com',         icon:'🤖',color:'rgba(16,185,129,0.48)'},
+  {id:'d11',name:'Sheets', url:'https://sheets.google.com',   icon:'📊',color:'rgba(16,185,129,0.52)'},
+  {id:'d12',name:'Meet',   url:'https://meet.google.com',     icon:'🎥',color:'rgba(14,165,233,0.52)'},
+];
+const WALLS=[
+  'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=80',
+  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80',
+  'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1920&q=80',
+  'https://images.unsplash.com/photo-1518020382113-a7e8fc38eac9?w=1920&q=80',
+  'https://images.unsplash.com/photo-1511497584788-876760111969?w=1920&q=80',
+  'https://images.unsplash.com/photo-1470770903676-69b98201ea1c?w=1920&q=80',
+];
+const COLORS=[
+  {h:'rgba(20,80,40,0.55)',  n:'Forest'},
+  {h:'rgba(16,185,129,0.5)', n:'Emerald'},
+  {h:'rgba(14,165,233,0.5)', n:'Sky'},
+  {h:'rgba(99,102,241,0.5)', n:'Indigo'},
+  {h:'rgba(236,72,153,0.5)', n:'Pink'},
+  {h:'rgba(245,158,11,0.5)', n:'Amber'},
+  {h:'rgba(239,68,68,0.5)',  n:'Red'},
+  {h:'rgba(255,255,255,0.08)',n:'Glass'},
+];
+
+// ═══════════════════════════════════════════════════════
+//  State
+// ═══════════════════════════════════════════════════════
+let slots    = new Array(TOTAL_SLOTS).fill(null);
+let isAdmin  = false;
+let selCol   = COLORS[0].h;
+let selSlot  = -1;
+let ttimer;
+let pinVal   = '';
+const drag = {active:false,srcSlot:-1,ghost:null,overSlot:-1};
+let longPressTimer = null;
+let touchStartX=0, touchStartY=0;
+const LONG_PRESS_MS = 280;
+const MOVE_THRESHOLD = 8;
+
+// ═══════════════════════════════════════════════════════
+//  INIT（セキュリティ初期化含む）
+// ═══════════════════════════════════════════════════════
+async function initSecurity(){
+  try{
+    // crypto.subtle が使えるか確認
+    if(crypto?.subtle){
+      const testBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('test'));
+      if(testBuf) cryptoAvailable = true;
+    }
+  }catch{ cryptoAvailable = false; }
+
+  try{
+    // ① PINマイグレーション：平文 ml_pin → ハッシュ ml_pin_hash
+    const oldPlain = SS.get('ml_pin', null);
+    if(oldPlain !== null){
+      const migHash = await hashPin(oldPlain);
+      SS.set('ml_pin_hash', migHash);
+      SS.del('ml_pin');
+    }
+    // デフォルトPINハッシュ（初回のみ）
+    if(!SS.get('ml_pin_hash')){
+      SS.set('ml_pin_hash', await hashPin('3150'));
+    }
+    ADMIN_PIN_HASH = SS.get('ml_pin_hash');
+  }catch(e){
+    // セキュリティ初期化失敗時：デフォルトPINのweakHashを使用
+    ADMIN_PIN_HASH = weakHash('3150' + PIN_SALT);
+  }
+}
+
+(async function(){
+  try{
+    await initSecurity();
+  }catch(e){
+    // 初期化失敗してもUIは必ず起動させる
+    ADMIN_PIN_HASH = weakHash('3150' + PIN_SALT);
+  }finally{
+    loadWall();
+    loadSlots();
+  }
+  // ⑨ セッションタイムアウト用アクティビティ監視
+  ['touchstart','click','keydown'].forEach(ev=>{
+    document.addEventListener(ev, ()=>SESSION.reset(), {passive:true});
+  });
+  // ⑨ ページ離脱確認（管理者モード中）
+  window.addEventListener('beforeunload', e=>{
+    if(isAdmin){ e.preventDefault(); e.returnValue=''; }
+  });
+})();
+
+// ═══════════════════════════════════════════════════════
+//  WALLPAPER
+// ═══════════════════════════════════════════════════════
+function loadWall(){
+  try{
+    const url = SS.get('ml_wall', WALLS[0]);
+    Object.assign(document.getElementById('bg').style,{
+      backgroundImage:`url('${url}')`,backgroundSize:'cover',backgroundPosition:'center'
+    });
+  }catch{}
+}
+function setWall(url){
+  SS.set('ml_wall', url);
+  document.getElementById('bg').style.backgroundImage=`url('${url}')`;
+  document.querySelectorAll('.wth').forEach(el=>el.classList.toggle('act',el.dataset.url===url));
+  toast('✅ 壁紙を変更しました','ok');
+}
+
+// ═══════════════════════════════════════════════════════
+//  SLOTS
+// ═══════════════════════════════════════════════════════
+function loadSlots(){
+  const saved = SS.getObj('ml_slots', null);
+  if(saved && Array.isArray(saved)){
+    slots = new Array(TOTAL_SLOTS).fill(null);
+    saved.forEach((v,i)=>{ if(i<TOTAL_SLOTS) slots[i]=v; });
+    ensureAdminIcon();
+  } else { initDefault(); }
+  render();
+}
+function initDefault(){
+  slots = new Array(TOTAL_SLOTS).fill(null);
+  DEMO.forEach((l,i)=>{ slots[i]=l; });
+  slots[23] = {...ADMIN_ENTRY};
+  saveSlots();
+}
+function ensureAdminIcon(){
+  if(slots.some(s=>s&&s.isAdmin)) return;
+  if(!slots[23]) slots[23]={...ADMIN_ENTRY};
+  else{ const i=slots.findIndex(s=>!s); if(i>=0) slots[i]={...ADMIN_ENTRY}; }
+  saveSlots();
+}
+function saveSlots(){ SS.setObj('ml_slots', slots); }
+
+// ═══════════════════════════════════════════════════════
+//  ② GAS連携（リクエストトークン付き）
+// ═══════════════════════════════════════════════════════
+function getGasToken(){ return SS.get('ml_gas_token',''); }
+
+async function syncFromGAS(){
+  if(!GAS_URL){ toast('GAS URLが未設定です（設定→GAS連携）','err'); return; }
+  if(!isValidGasUrl(GAS_URL)){ toast('GAS URLの形式が正しくありません','err'); return; }
+  toast('⏳ 同期中...');
+  try{
+    const res  = await fetch(`${GAS_URL}?action=get&token=${encodeURIComponent(getGasToken())}`);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if(json.status==='ok' && Array.isArray(json.data)){
+      const adminSlot = slots.findIndex(s=>s&&s.isAdmin);
+      slots = new Array(TOTAL_SLOTS).fill(null);
+      // ⑤ 各エントリを検証してから代入
+      json.data.forEach((lnk,i)=>{
+        if(i<TOTAL_SLOTS && validateEntry(lnk)) slots[i]=lnk;
+      });
+      const ai = adminSlot>=0 ? adminSlot : 23;
+      if(!slots[ai]) slots[ai]={...ADMIN_ENTRY};
+      saveSlots(); render();
+      toast('✅ GASから同期しました','ok');
+    } else { throw new Error('invalid response'); }
+  }catch(e){ toast('GAS接続に失敗しました','err'); }
+}
+
+async function pushToGAS(entry){
+  if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;
+  try{
+    await fetch(GAS_URL,{
+      method:'POST',
+      body:JSON.stringify({action:'add', token:getGasToken(), ...entry})
+    });
+  }catch{}  // ⑩ サイレント失敗
+}
+async function deleteFromGAS(id){
+  if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;
+  try{
+    await fetch(GAS_URL,{method:'POST',body:JSON.stringify({action:'delete',token:getGasToken(),id})});
+  }catch{}
+}
+
+// ═══════════════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════════════
+function render(){
+  const grid = document.getElementById('icon-grid');
+  grid.innerHTML = '';
+  grid.className = isAdmin ? 'admin-mode' : '';
+  for(let i=0;i<TOTAL_SLOTS;i++){
+    const slotEl = document.createElement('div');
+    slotEl.className = 'slot';
+    slotEl.dataset.slot = i;
+    if(slots[i]){
+      slotEl.appendChild(buildCard(slots[i],i));
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'slot-empty';
+      if(isAdmin) empty.addEventListener('click',()=>openPanel('add',i));
+      slotEl.appendChild(empty);
+    }
+    grid.appendChild(slotEl);
+  }
+}
+
+// ④ XSS対策：DOM APIのみ使用（innerHTML排除）
+function buildCard(entry, slotIdx){
+  const isAdminIcon = !!entry.isAdmin;
+  const card = document.createElement('div');
+  card.className = 'icon-card' + (isAdminIcon?' is-admin-icon':'');
+  card.dataset.slot = slotIdx;
+
+  if(!isAdminIcon){
+    const badge = document.createElement('div');
+    badge.className = 'del-badge';
+    badge.textContent = '×';
+    badge.addEventListener('touchstart', e=>{
+      e.stopPropagation(); e.preventDefault();
+      if(confirm(`「${entry.name}」を削除しますか？`)){
+        deleteFromGAS(entry.id);
+        slots[slotIdx]=null; saveSlots(); render();
+        toast('🗑 削除しました');
+      }
+    },{passive:false});
+    card.appendChild(badge);
+  }
+
+  const vis = document.createElement('div');
+  vis.className = 'icon-visual';
+  vis.style.background = entry.color || COLORS[0].h;
+
+  if(entry.icon && entry.icon.startsWith('https://')){
+    // ⑥ https:// のみ許可
+    const img = document.createElement('img');
+    img.src = entry.icon; img.alt = '';
+    img.width = 36; img.height = 36;
+    img.style.cssText = 'object-fit:contain;border-radius:8px';
+    img.onerror = ()=>img.replaceWith(mkInit(entry.name));
+    vis.appendChild(img);
+  } else if(entry.icon){
+    vis.textContent = entry.icon.slice(0,2);
+  } else {
+    vis.appendChild(mkInit(entry.name));
+  }
+
+  const lbl = document.createElement('div');
+  lbl.className = 'icon-label';
+  lbl.textContent = entry.name;  // textContent でXSS防止
+
+  card.appendChild(vis); card.appendChild(lbl);
+  card.addEventListener('touchstart', e=>onTouchStart(e,slotIdx,isAdminIcon),{passive:false});
+  card.addEventListener('touchmove',  e=>onCardTouchMove(e),{passive:false});
+  card.addEventListener('touchend',   e=>onCardTouchEnd(e,slotIdx,isAdminIcon),{passive:false});
+  return card;
+}
+
+function mkInit(name){
+  const s = document.createElement('span');
+  s.className = 'icon-initial';
+  s.textContent = (name||'?').charAt(0).toUpperCase();
+  return s;
+}
+
+// ═══════════════════════════════════════════════════════
+//  TOUCH DRAG（長押し→ドラッグ）
+// ═══════════════════════════════════════════════════════
+function onTouchStart(e,slotIdx,isAdminIcon){
+  if(e.target.classList.contains('del-badge')) return;
+  if(!isAdmin) return;
+  const t = e.touches[0];
+  touchStartX=t.clientX; touchStartY=t.clientY;
+  const slotEl = document.querySelector(`.slot[data-slot="${slotIdx}"]`);
+  longPressTimer = setTimeout(()=>{
+    longPressTimer = null;
+    if(slotEl) slotEl.classList.add('long-press-active');
+    setTimeout(()=>{
+      if(slotEl) slotEl.classList.remove('long-press-active');
+      beginDrag(slotIdx, touchStartX, touchStartY);
+    },120);
+  }, LONG_PRESS_MS);
+}
+function onCardTouchMove(e){
+  if(!longPressTimer && !drag.active) return;
+  const t = e.touches[0];
+  const dx=t.clientX-touchStartX, dy=t.clientY-touchStartY;
+  if(Math.sqrt(dx*dx+dy*dy)>MOVE_THRESHOLD){
+    if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
+  }
+  if(drag.active){e.preventDefault();moveDragGhost(t.clientX,t.clientY);}
+}
+function onCardTouchEnd(e,slotIdx,isAdminIcon){
+  if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
+  if(drag.active){const t=e.changedTouches[0];dropAt(t.clientX,t.clientY);return;}
+  if(!isAdmin){
+    if(isAdminIcon){openPwModal();return;}
+    return;
+  }
+  if(isAdminIcon){exitAdmin();return;}
+  openPanel('edit',slotIdx);
+}
+
+function beginDrag(slotIdx,cx,cy){
+  const entry=slots[slotIdx]; if(!entry) return;
+  if(navigator.vibrate) navigator.vibrate(30);
+  document.getElementById('icon-grid').classList.add('dragging-active');
+  const ghost=document.createElement('div'); ghost.id='drag-ghost';
+  const gv=document.createElement('div'); gv.className='icon-visual';
+  gv.style.background=entry.color||COLORS[0].h;
+  gv.textContent=entry.icon||entry.name.charAt(0).toUpperCase();
+  const gl=document.createElement('div'); gl.className='icon-label';
+  gl.textContent=entry.name;
+  ghost.appendChild(gv); ghost.appendChild(gl);
+  ghost.style.left=(cx-30)+'px'; ghost.style.top=(cy-52)+'px';
+  document.body.appendChild(ghost);
+  const srcEl=document.querySelector(`.slot[data-slot="${slotIdx}"]`);
+  if(srcEl) srcEl.classList.add('is-drag-src');
+  drag.active=true; drag.srcSlot=slotIdx; drag.ghost=ghost; drag.overSlot=-1;
+  document.addEventListener('touchmove',onGlobalMove,{passive:false});
+  document.addEventListener('touchend', onGlobalEnd, {passive:false});
+  document.addEventListener('touchcancel',cancelDrag,{passive:false});
+}
+function onGlobalMove(e){if(!drag.active)return;e.preventDefault();const t=e.touches[0];moveDragGhost(t.clientX,t.clientY);}
+function onGlobalEnd(e){if(!drag.active)return;const t=e.changedTouches[0];dropAt(t.clientX,t.clientY);}
+function moveDragGhost(cx,cy){
+  drag.ghost.style.left=(cx-30)+'px'; drag.ghost.style.top=(cy-52)+'px';
+  drag.ghost.style.visibility='hidden';
+  const el=document.elementFromPoint(cx,cy);
+  drag.ghost.style.visibility='';
+  const si=el?.closest('.slot'); const oi=si?parseInt(si.dataset.slot):-1;
+  if(oi!==drag.overSlot){clearHL();drag.overSlot=oi;if(oi>=0&&oi!==drag.srcSlot)hlSlot(oi);}
+}
+function dropAt(cx,cy){
+  drag.ghost.style.visibility='hidden';
+  const el=document.elementFromPoint(cx,cy);
+  drag.ghost.style.visibility='';
+  const si=el?.closest('.slot'); const di=si?parseInt(si.dataset.slot):-1;
+  if(di>=0&&di!==drag.srcSlot){
+    if(slots[di]===null){
+      slots[di]=slots[drag.srcSlot]; slots[drag.srcSlot]=null;
+      saveSlots(); toast(`コマ${drag.srcSlot+1}→コマ${di+1} 移動しました`,'ok');
+    } else { toast('そのコマはすでに使用中です','err'); }
+  }
+  finishDrag();
+}
+function cancelDrag(){finishDrag();}
+function hlSlot(i){
+  const el=document.querySelector(`.slot[data-slot="${i}"]`); if(!el)return;
+  el.classList.add(slots[i]===null?'drag-accept':'drag-reject');
+}
+function clearHL(){ document.querySelectorAll('.drag-accept,.drag-reject').forEach(el=>el.classList.remove('drag-accept','drag-reject')); }
+function finishDrag(){
+  clearHL();
+  if(drag.ghost){drag.ghost.remove();drag.ghost=null;}
+  document.getElementById('icon-grid').classList.remove('dragging-active');
+  const se=document.querySelector(`.slot[data-slot="${drag.srcSlot}"]`);
+  if(se) se.classList.remove('is-drag-src');
+  drag.active=false; drag.srcSlot=-1; drag.overSlot=-1;
+  document.removeEventListener('touchmove',onGlobalMove);
+  document.removeEventListener('touchend', onGlobalEnd);
+  document.removeEventListener('touchcancel',cancelDrag);
+  render();
+}
+
+// 通常タップ（click）
+document.getElementById('icon-grid').addEventListener('click',e=>{
+  if(isAdmin) return;
+  const card=e.target.closest('.icon-card'); if(!card)return;
+  const si=parseInt(card.dataset.slot); if(isNaN(si)||!slots[si])return;
+  if(slots[si].isAdmin){openPwModal();return;}
+  // ⑥ URLを再検証してから開く
+  if(isSafeUrl(slots[si].url)) window.open(slots[si].url,'_blank','noopener,noreferrer');
+});
+
+// ═══════════════════════════════════════════════════════
+//  ADMIN
+// ═══════════════════════════════════════════════════════
+function enterAdmin(){
+  isAdmin=true;
+  document.getElementById('admin-bar').classList.add('show');
+  document.getElementById('tabbar').classList.add('admin-mode');
+  SESSION.reset();  // ⑨ タイムアウト開始
+  render();
+  toast('◈ 編集モードに入りました','ok');
+}
+function exitAdmin(){
+  isAdmin=false;
+  document.getElementById('admin-bar').classList.remove('show');
+  document.getElementById('tabbar').classList.remove('admin-mode');
+  SESSION.clear();  // ⑨ タイムアウトキャンセル
+  closePanelUI(); render();
+  toast('完了しました');
+}
+
+// ═══════════════════════════════════════════════════════
+//  ③ PIN認証（ブルートフォース保護 + SHA-256ハッシュ）
+// ═══════════════════════════════════════════════════════
+function openPwModal(onSuccess){
+  // ③ ロック中チェック
+  if(BF.isLocked()){
+    toast(`🔒 ${BF.remaining()}秒後に再試行してください`,'err');
+    return;
+  }
+  pinVal=''; updateDots();
+  document.getElementById('pw-error').textContent='';
+  document.getElementById('pw-sub').textContent='4桁のPINを入力してください';
+  document.getElementById('pw-modal').classList.add('open');
+  document.getElementById('pw-modal')._onSuccess=onSuccess||null;
+}
+function closePwModal(){
+  document.getElementById('pw-modal').classList.remove('open');
+  pinVal=''; updateDots();
+}
+function pinInput(d){
+  if(BF.isLocked()){ toast(`🔒 ${BF.remaining()}秒後に再試行してください`,'err'); return; }
+  if(pinVal.length>=4) return;
+  pinVal+=d; updateDots();
+  if(pinVal.length===4) setTimeout(checkPin, 120);
+}
+function pinDelete(){
+  pinVal=pinVal.slice(0,-1); updateDots();
+  document.getElementById('pw-error').textContent='';
+}
+function updateDots(){
+  for(let i=0;i<4;i++){
+    const d=document.getElementById('dot'+i);
+    d.classList.toggle('filled',i<pinVal.length); d.classList.remove('error');
+  }
+}
+async function checkPin(){
+  const inputHash = await hashPin(pinVal);
+  if(inputHash === ADMIN_PIN_HASH){
+    BF.onSuccess();
+    closePwModal();
+    const cb=document.getElementById('pw-modal')._onSuccess;
+    if(cb) cb(); else enterAdmin();
+  } else {
+    const result = BF.onFail();
+    for(let i=0;i<4;i++) document.getElementById('dot'+i).classList.add('error');
+    if(navigator.vibrate) navigator.vibrate([50,30,50]);
+    if(result.locked){
+      document.getElementById('pw-error').textContent=`${result.remaining}秒間ロックされました`;
+    } else {
+      document.getElementById('pw-error').textContent=`パスワードが違います（残り${result.left}回）`;
+    }
+    setTimeout(()=>{ pinVal=''; updateDots(); document.getElementById('pw-error').textContent=''; },900);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  PANELS
+// ═══════════════════════════════════════════════════════
+function openPanel(type, slotIdx){
+  const badge=document.getElementById('panel-badge');
+  badge.style.display='';
+  if(type==='add'){
+    badge.textContent='◈ 追加';
+    document.getElementById('ptitle').textContent='アイコンを追加';
+    document.getElementById('pdesc').textContent=slotIdx>=0?`コマ${slotIdx+1}に追加`:'空きコマを選んで追加';
+    selCol=COLORS[0].h; selSlot=slotIdx>=0?slotIdx:-1;
+    buildAddForm(slotIdx);
+  } else if(type==='edit'){
+    badge.textContent='◈ 編集';
+    const entry=slots[slotIdx];
+    document.getElementById('ptitle').textContent='アイコンを編集';
+    document.getElementById('pdesc').textContent=`コマ${slotIdx+1} · ${entry.name}`;
+    selCol=entry.color||COLORS[0].h; selSlot=slotIdx;
+    buildEditForm(slotIdx,entry);
+  } else if(type==='wallpaper'){
+    badge.textContent='🖼 壁紙';
+    document.getElementById('ptitle').textContent='壁紙を選択';
+    document.getElementById('pdesc').textContent='背景をカスタマイズ';
+    buildWallpaperPanel();
+  } else if(type==='settings'){
+    badge.textContent='⚙ 設定';
+    document.getElementById('ptitle').textContent='設定';
+    document.getElementById('pdesc').textContent='アプリの設定と連携';
+    buildSettingsPanel();
+  }
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('panel').classList.add('open');
+}
+function closePanelUI(){
+  document.getElementById('overlay').classList.remove('open');
+  document.getElementById('panel').classList.remove('open');
+}
+function overlayClick(e){ if(e.target.id==='overlay') closePanelUI(); }
+
+// ④ フォームビルダー：innerHTML最小化・DOM操作ベース
+function buildAddForm(preSlot){
+  const pb = document.getElementById('pb');
+  pb.innerHTML = '';  // クリア
+
+  // プレビュー
+  pb.appendChild(buildPreviewEl());
+
+  // フォームフィールド
+  pb.appendChild(buildField('アプリ名 *','fn','text','例: Google Drive',true,20));
+  pb.appendChild(buildField('URL *','fu','url','https://',true));
+  pb.appendChild(buildField('アイコン（絵文字 or 画像URL）','fi','text','🌿 または https://...'));
+  pb.appendChild(buildColorPicker());
+
+  // スロット選択
+  const sttl=document.createElement('p');sttl.className='sttl';
+  const lbl=document.createElement('span');lbl.id='sel-lbl';lbl.style.cssText='color:var(--accent);font-weight:700';
+  lbl.textContent=preSlot>=0?`コマ${preSlot+1} を選択中`:'';
+  sttl.textContent='配置コマ '; sttl.appendChild(lbl);
+  const sub=document.createElement('p');sub.className='sttl-sub';
+  sub.textContent='空きコマをタップして選択。暗いコマは使用中。';
+
+  const miniGrid=buildMiniGrid(preSlot);
+  const btn=document.createElement('button');
+  btn.className='btn-p';btn.style.marginTop='14px';
+  btn.textContent='＋ 追加する';
+  btn.addEventListener('click',()=>saveLink(false));
+
+  pb.appendChild(sttl);pb.appendChild(sub);pb.appendChild(miniGrid);pb.appendChild(btn);
+  livePrev();
+}
+
+function buildEditForm(slotIdx, entry){
+  const pb=document.getElementById('pb'); pb.innerHTML='';
+  selCol=entry.color||COLORS[0].h;
+  pb.appendChild(buildPreviewEl(entry));
+  pb.appendChild(buildField('アプリ名 *','fn','text','',true,20,entry.name));
+  pb.appendChild(buildField('URL *','fu','url','',true,null,entry.url));
+  pb.appendChild(buildField('アイコン（絵文字 or 画像URL）','fi','text','🌿 または https://...',false,null,entry.icon||''));
+  pb.appendChild(buildColorPicker(entry.color));
+
+  const btnU=document.createElement('button');btnU.className='btn-p';btnU.style.marginTop='14px';
+  btnU.textContent='✓ 更新する';btnU.addEventListener('click',()=>saveLink(true));
+  const btnD=document.createElement('button');btnD.className='btn-danger';
+  btnD.textContent='🗑 このアイコンを削除';btnD.addEventListener('click',()=>confirmDelete(slotIdx));
+  pb.appendChild(btnU);pb.appendChild(btnD);
+  livePrev();
+}
+
+// ④ フォームヘルパー（DOM生成）
+function buildPreviewEl(entry){
+  const wrap=document.createElement('div'); wrap.id='iprev';
+  const icon=document.createElement('div'); icon.id='picon';
+  icon.style.background=entry?entry.color:COLORS[0].h;
+  icon.textContent=entry?(entry.icon||entry.name.charAt(0)):'🌿';
+  const info=document.createElement('div');
+  const nm=document.createElement('div');nm.id='pname';nm.textContent=entry?entry.name:'アプリ名';
+  const ur=document.createElement('div');ur.id='purl';ur.textContent=entry?entry.url:'https://example.com';
+  info.appendChild(nm);info.appendChild(ur);
+  wrap.appendChild(icon);wrap.appendChild(info);
+  return wrap;
+}
+function buildField(labelText, id, type, placeholder, required=false, maxlen=null, value=''){
+  const fg=document.createElement('div');fg.className='fg';
+  const lbl=document.createElement('label');lbl.textContent=labelText;lbl.htmlFor=id;
+  const inp=document.createElement('input');
+  inp.type=type;inp.id=id;inp.placeholder=placeholder;
+  if(required) inp.required=true;
+  if(maxlen) inp.maxLength=maxlen;
+  if(value) inp.value=value;
+  inp.addEventListener('input',livePrev);
+  if(type==='url') inp.addEventListener('blur',()=>autoPrefix(id));
+  fg.appendChild(lbl);fg.appendChild(inp);
+  return fg;
+}
+function buildColorPicker(selected=null){
+  const fg=document.createElement('div');fg.className='fg';
+  const lbl=document.createElement('label');lbl.textContent='背景カラー';
+  const row=document.createElement('div');row.className='swatches';
+  COLORS.forEach((c,i)=>{
+    const sw=document.createElement('div');sw.className='sw';
+    sw.style.background=c.h; sw.title=c.n;
+    const isSel = selected ? c.h===selected : i===0;
+    if(isSel){sw.classList.add('sel');selCol=c.h;}
+    sw.addEventListener('click',()=>pickCol(c.h,sw));
+    row.appendChild(sw);
+  });
+  fg.appendChild(lbl);fg.appendChild(row);
+  return fg;
+}
+function buildMiniGrid(preSlot){
+  const grid=document.createElement('div');grid.id='slot-mini-grid';
+  for(let i=0;i<TOTAL_SLOTS;i++){
+    const occ=slots[i]!==null;
+    const cell=document.createElement('div');
+    cell.className='slot-cell'+(occ?' occupied':'')+(i===preSlot?' selected':'');
+    cell.dataset.mini=i;
+    if(!occ){
+      const em=document.createElement('span');em.textContent='';
+      cell.appendChild(em);
+      cell.addEventListener('click',()=>selectSlot(i,cell));
+    } else {
+      const em=document.createElement('span');
+      em.textContent=slots[i].icon||slots[i].name.charAt(0);
+      cell.appendChild(em);
+    }
+    grid.appendChild(cell);
+  }
+  return grid;
+}
+
+function buildWallpaperPanel(){
+  const pb=document.getElementById('pb'); pb.innerHTML='';
+  let cur=SS.get('ml_wall',WALLS[0]);
+
+  const t=document.createElement('p');t.className='sttl';t.textContent='プリセット';
+  pb.appendChild(t);
+  const wg=document.createElement('div');wg.id='wgrid';
+  WALLS.forEach(u=>{
+    const th=document.createElement('div');th.className='wth'+(u===cur?' act':'');
+    th.style.backgroundImage=`url('${u}&w=400&q=55')`;th.dataset.url=u;
+    th.addEventListener('click',()=>setWall(u));
+    wg.appendChild(th);
+  });
+  pb.appendChild(wg);
+
+  const t2=document.createElement('p');t2.className='sttl';t2.style.marginTop='18px';t2.textContent='カスタムURL';
+  const fg=document.createElement('div');fg.className='fg';
+  const inp=document.createElement('input');inp.id='cw';inp.type='url';
+  inp.placeholder='https://images.unsplash.com/...';
+  inp.addEventListener('blur',()=>autoPrefix('cw'));
+  fg.appendChild(inp);
+  const btn=document.createElement('button');btn.className='btn-p';btn.textContent='✓ 適用';
+  btn.addEventListener('click',applyWall);
+  pb.appendChild(t2);pb.appendChild(fg);pb.appendChild(btn);
+}
+
+function buildSettingsPanel(){
+  const pb=document.getElementById('pb');
+  const gasOk=isValidGasUrl(GAS_URL);
+  const tokenSet=!!getGasToken();
+
+  pb.innerHTML=`
+    <p class="sttl">GAS連携（スプレッドシート）</p>
+    <div id="gas-status" class="${gasOk?'connected':'disconnected'}">
+      ${gasOk?'✅ 接続済み（'+GAS_URL.slice(0,38)+'...）':'⚠ GAS URLが未設定または不正です'}
+    </div>
+    <div class="fg"><label>GAS Web App URL</label>
+      <input id="gas-url-input" type="url" value="${GAS_URL}"
+        placeholder="https://script.google.com/macros/s/.../exec"/></div>
+    <div class="fg"><label>リクエストトークン（GAS側と共通設定）</label>
+      <input id="gas-token-input" type="password" value="${getGasToken()}"
+        placeholder="任意の共通パスワード"/></div>
+    <button class="btn-p" onclick="saveGasUrl()">💾 GAS URLを保存</button>
+    <button class="btn-p" style="margin-top:8px;background:rgba(14,165,233,.15);color:#38bdf8;border-color:rgba(14,165,233,.3)" onclick="syncFromGAS()">↓ GASから同期</button>
+    <div class="hr"></div>
+    <p class="sttl">パスワード変更</p>
+    <p class="sttl-sub">現在のPINを確認してから新しいPINを設定します</p>
+    <div class="fg"><label>新しいPIN（4桁数字）</label>
+      <input id="new-pin" type="password" inputmode="numeric" maxlength="4" placeholder="4桁の数字"/></div>
+    <button class="btn-p" onclick="changePin()">🔑 PINを変更する</button>
+    <div class="hr"></div>
+    <p class="sttl">⑨ セッション設定</p>
+    <div class="setting-row">
+      <div><div class="setting-label">自動ログアウト</div>
+        <div class="setting-sub">無操作10分で管理者モード終了</div></div>
+      <div class="setting-val">有効</div>
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">ブルートフォース保護</div>
+        <div class="setting-sub">5回失敗 → 30秒ロック</div></div>
+      <div class="setting-val">有効</div>
+    </div>
+    <div class="hr"></div>
+    <p class="sttl">データ管理</p>
+    <div style="display:flex;gap:8px">
+      <button class="btn-danger" style="margin-top:0;flex:1" onclick="resetData()">↺ 初期化</button>
+      <button class="btn-danger" style="margin-top:0;flex:1;background:rgba(248,113,113,.2)" onclick="exportData()">📤 エクスポート</button>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════════════════
+//  FORM ロジック
+// ═══════════════════════════════════════════════════════
+function selectSlot(i,el){
+  selSlot=i;
+  document.querySelectorAll('.slot-cell').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  const lbl=document.getElementById('sel-lbl');
+  if(lbl) lbl.textContent=`コマ ${i+1} を選択中`;
+}
+function pickCol(h,el){
+  selCol=h;
+  document.querySelectorAll('.sw').forEach(s=>s.classList.remove('sel'));
+  el.classList.add('sel'); livePrev();
+}
+
+// ④ livePrev: innerHTML排除・DOM操作のみ
+function livePrev(){
+  const fnEl=document.getElementById('fn');
+  const fuEl=document.getElementById('fu');
+  const fiEl=document.getElementById('fi');
+  const pi=document.getElementById('picon'); if(!pi) return;
+
+  const name=(fnEl?.value)||'アプリ名';
+  const url =(fuEl?.value)||'https://example.com';
+  const icon=(fiEl?.value)||'';
+
+  pi.style.background=selCol;
+  // 子要素をクリアしてから再構築
+  while(pi.firstChild) pi.removeChild(pi.firstChild);
+  if(icon.startsWith('https://')){
+    // ⑥ https://のみ許可
+    const img=document.createElement('img');
+    img.src=icon;img.alt='';img.style.cssText='width:32px;height:32px;border-radius:6px;object-fit:contain';
+    img.onerror=()=>{img.remove();pi.textContent=name.charAt(0).toUpperCase()||'?';};
+    pi.appendChild(img);
+  } else if(icon){
+    pi.textContent=icon.slice(0,2);
+  } else {
+    pi.textContent=name.charAt(0).toUpperCase()||'?';
+  }
+
+  const nm=document.getElementById('pname'); if(nm) nm.textContent=name;
+  const ur=document.getElementById('purl');  if(ur) ur.textContent=url;
+}
+
+// ⑥ URLホワイトリスト自動補完（https://のみ）
+function autoPrefix(id){
+  const el=document.getElementById(id); if(!el) return;
+  let v=el.value.trim();
+  if(v && !v.match(/^https?:\/\//i)){
+    v='https://'+v; el.value=v; livePrev();
+  }
+  // ⑥ javascript: vbscript: data: を排除
+  if(v.match(/^(javascript|vbscript|data):/i)){
+    el.value=''; toast('このURLは使用できません','err');
+  }
+}
+
+function saveLink(isEdit){
+  const name=(document.getElementById('fn')?.value||'').trim();
+  let   url =(document.getElementById('fu')?.value||'').trim();
+  const icon=(document.getElementById('fi')?.value||'').trim();
+  if(!name){toast('アプリ名を入力してください','err');return;}
+  if(!url) {toast('URLを入力してください','err');return;}
+  if(!url.match(/^https?:\/\//i)) url='https://'+url;
+  // ⑥ URLバリデーション
+  if(!isSafeUrl(url)){toast('https:// または http:// のURLを入力してください','err');return;}
+  if(selSlot<0){toast('配置コマを選択してください','err');return;}
+  if(!isEdit&&slots[selSlot]!==null){toast('そのコマはすでに使用中です','err');return;}
+
+  // ⑦ icon が http:// の場合 https:// に変換
+  const safeIcon = icon.startsWith('http://') ? icon.replace('http://','https://') : icon;
+
+  const id=isEdit?slots[selSlot].id:('l'+Date.now());
+  const entry={id,name,url,icon:safeIcon,color:selCol};
+  slots[selSlot]=entry; saveSlots(); render(); closePanelUI();
+  if(!isEdit) pushToGAS(entry);
+  toast(`✅ ${isEdit?'更新':'追加'}しました（コマ${selSlot+1}）`,'ok');
+}
+
+function confirmDelete(slotIdx){
+  if(!confirm(`「${slots[slotIdx].name}」を削除しますか？`)) return;
+  deleteFromGAS(slots[slotIdx].id);
+  slots[slotIdx]=null; saveSlots(); render(); closePanelUI();
+  toast('🗑 削除しました');
+}
+
+function applyWall(){
+  const el=document.getElementById('cw'); if(!el) return;
+  let url=el.value.trim();
+  if(!url) return;
+  if(!url.match(/^https?:\/\//i)) url='https://'+url;
+  if(!isSafeUrl(url)){toast('URLが正しくありません','err');return;}
+  setWall(url);
+}
+
+// ═══════════════════════════════════════════════════════
+//  設定フォームアクション
+// ═══════════════════════════════════════════════════════
+function saveGasUrl(){
+  const url=(document.getElementById('gas-url-input')?.value||'').trim();
+  const token=(document.getElementById('gas-token-input')?.value||'').trim();
+  // ⑧ HTTPS + Google Scripts ドメイン限定
+  if(url && !isValidGasUrl(url)){
+    toast('https://script.google.com から始まるURLを入力してください','err'); return;
+  }
+  GAS_URL=url; SS.set('ml_gas',url);
+  if(token) SS.set('ml_gas_token', token);
+  toast(url?'✅ GAS URLを保存しました':'GAS URLをクリアしました','ok');
+  buildSettingsPanel();
+}
+
+async function changePin(){
+  const np=(document.getElementById('new-pin')?.value||'').trim();
+  if(!/^\d{4}$/.test(np)){toast('4桁の数字で入力してください','err');return;}
+  openPwModal(async()=>{
+    const newHash=await hashPin(np);
+    SS.set('ml_pin_hash', newHash);
+    ADMIN_PIN_HASH=newHash;
+    toast('✅ PINを変更しました','ok');
+    openPanel('settings');
+  });
+}
+
+function resetData(){
+  if(!confirm('すべてのアイコンデータを初期化しますか？\n（この操作は元に戻せません）')) return;
+  SS.del('ml_slots'); initDefault(); render(); closePanelUI();
+  toast('↺ データを初期化しました');
+}
+
+function exportData(){
+  try{
+    const data={slots,wall:SS.get('ml_wall'),exported:new Date().toISOString()};
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`metamor-${Date.now()}.json`;
+    a.click();
+    toast('📤 エクスポートしました','ok');
+  }catch{ toast('エクスポートに失敗しました','err'); }
+}
+
+// ═══════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════
+function toast(msg, type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.className=`show ${type}`;
+  clearTimeout(ttimer); ttimer=setTimeout(()=>el.className='',2800);
+}
+</script>
+</body>
+</html>
