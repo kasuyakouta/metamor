@@ -914,14 +914,16 @@ function buildCard(entry, slotIdx){
     const badge = document.createElement('div');
     badge.className = 'del-badge';
     badge.textContent = '×';
-    badge.addEventListener('touchstart', e=>{
+    const doBadgeDelete = e=>{
       e.stopPropagation(); e.preventDefault();
       if(confirm(`「${entry.name}」を削除しますか？`)){
         deleteFromGAS(entry.id);
         slots[slotIdx]=null; saveSlots(); render();
         toast('🗑 削除しました');
       }
-    },{passive:false});
+    };
+    badge.addEventListener('touchstart', doBadgeDelete, {passive:false});
+    badge.addEventListener('click',      doBadgeDelete);
     card.appendChild(badge);
   }
 
@@ -951,6 +953,9 @@ function buildCard(entry, slotIdx){
   card.addEventListener('touchstart', e=>onTouchStart(e,slotIdx,isAdminIcon),{passive:false});
   card.addEventListener('touchmove',  e=>onCardTouchMove(e),{passive:false});
   card.addEventListener('touchend',   e=>onCardTouchEnd(e,slotIdx,isAdminIcon),{passive:false});
+  // PC（マウス）対応
+  card.addEventListener('mousedown',  e=>onMouseDown(e,slotIdx,isAdminIcon));
+  card.addEventListener('click',      e=>onCardClick(e,slotIdx,isAdminIcon));
   return card;
 }
 
@@ -997,6 +1002,66 @@ function onCardTouchEnd(e,slotIdx,isAdminIcon){
   }
   if(isAdminIcon){exitAdmin();return;}
   openPanel('edit',slotIdx);
+}
+
+// ── PC（マウス）用イベントハンドラ ─────────────────────────
+let mouseDragTimer = null;
+let mouseDragStartX = 0, mouseDragStartY = 0;
+
+function onMouseDown(e, slotIdx, isAdminIcon){
+  if(!isAdmin) return;
+  if(e.target.classList.contains('del-badge')) return;
+  if(e.button !== 0) return; // 左クリックのみ
+
+  mouseDragStartX = e.clientX;
+  mouseDragStartY = e.clientY;
+
+  // 長押し相当：mousedown後にmousemoveが来たらドラッグ開始
+  const onMouseMove = (me) => {
+    const dx = me.clientX - mouseDragStartX;
+    const dy = me.clientY - mouseDragStartY;
+    if(Math.sqrt(dx*dx+dy*dy) > 6){
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup',   onMouseUpCancel);
+      beginMouseDrag(slotIdx, me.clientX, me.clientY);
+    }
+  };
+  const onMouseUpCancel = () => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup',   onMouseUpCancel);
+  };
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup',   onMouseUpCancel);
+}
+
+function beginMouseDrag(slotIdx, cx, cy){
+  // beginDrag と同じ処理（touch版を流用）
+  beginDrag(slotIdx, cx, cy);
+  // グローバルmousemove/mouseupを登録（touch版のglobalMove/Endに相当）
+  const onMove = e => {
+    if(!drag.active) return;
+    moveDragGhost(e.clientX, e.clientY);
+  };
+  const onUp = e => {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup',   onUp);
+    if(drag.active) dropAt(e.clientX, e.clientY);
+  };
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup',   onUp);
+}
+
+function onCardClick(e, slotIdx, isAdminIcon){
+  if(e.target.classList.contains('del-badge')) return; // バッジはバッジ側で処理
+  if(drag.active) return; // ドラッグ後のクリックは無視
+
+  if(!isAdmin){
+    // 通常モード：グリッドのclickハンドラで対応済み
+    return;
+  }
+  // 管理者モード
+  if(isAdminIcon){ exitAdmin(); return; }
+  openPanel('edit', slotIdx);
 }
 
 function beginDrag(slotIdx,cx,cy){
@@ -1067,11 +1132,19 @@ function finishDrag(){
 
 // 通常タップ（click）
 document.getElementById('icon-grid').addEventListener('click',e=>{
-  if(isAdmin) return;
+  // 削除バッジ・ドラッグ後は無視
+  if(e.target.classList.contains('del-badge')) return;
+  if(drag.active) return;
   const card=e.target.closest('.icon-card'); if(!card)return;
-  const si=parseInt(card.dataset.slot); if(isNaN(si)||!slots[si])return;
+  const si=parseInt(card.dataset.slot); if(isNaN(si)) return;
+
+  if(isAdmin){
+    // 管理者モード：PC用クリック処理はonCardClickで対応
+    return;
+  }
+  // 通常モード
+  if(!slots[si]) return;
   if(slots[si].isAdmin){openPwModal();return;}
-  // ⑥ URLを再検証してから開く
   if(isSafeUrl(slots[si].url)) window.open(slots[si].url,'_blank','noopener,noreferrer');
 });
 
