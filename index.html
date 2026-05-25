@@ -640,6 +640,9 @@ async function initSecurity(){
   }catch(e){
     ADMIN_PIN_HASH = weakHash('3150' + PIN_SALT);
   }finally{
+    // 旧Unsplash壁紙が保存されていたら黒にリセット
+    const _w = SS.get('ml_wall','');
+    if(_w && _w.includes('unsplash.com')) SS.set('ml_wall','');
     // URLパラメータによる自動設定（?gas=...&token=...）
     applyUrlParams();
     loadWall();
@@ -699,15 +702,23 @@ function applyUrlParams(){
 // ═══════════════════════════════════════════════════════
 function loadWall(){
   try{
-    const url = SS.get('ml_wall', WALLS[0]);
-    Object.assign(document.getElementById('bg').style,{
-      backgroundImage:`url('${url}')`,backgroundSize:'cover',backgroundPosition:'center'
-    });
+    const url = SS.get('ml_wall', '');  // デフォルト：画像なし（黒）
+    const bg  = document.getElementById('bg');
+    if(url && isSafeUrl(url)){
+      Object.assign(bg.style,{backgroundImage:`url('${url}')`,backgroundSize:'cover',backgroundPosition:'center'});
+    } else {
+      bg.style.backgroundImage = 'none';  // 黒背景
+    }
   }catch{}
 }
 function setWall(url){
   SS.set('ml_wall', url);
-  document.getElementById('bg').style.backgroundImage=`url('${url}')`;
+  const bg = document.getElementById('bg');
+  if(url){
+    Object.assign(bg.style,{backgroundImage:`url('${url}')`,backgroundSize:'cover',backgroundPosition:'center'});
+  } else {
+    bg.style.backgroundImage = 'none';
+  }
   document.querySelectorAll('.wth').forEach(el=>el.classList.toggle('act',el.dataset.url===url));
   toast('✅ 壁紙を変更しました','ok');
 }
@@ -1205,6 +1216,13 @@ function buildWallpaperPanel(){
   const t=document.createElement('p');t.className='sttl';t.textContent='プリセット';
   pb.appendChild(t);
   const wg=document.createElement('div');wg.id='wgrid';
+  // 「黒（なし）」選択肢
+  const none=document.createElement('div');
+  none.className='wth'+((!cur||cur==='')?' act':'');
+  none.style.cssText='background:#000;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:rgba(255,255,255,.4)';
+  none.textContent='⬛ 黒';none.dataset.url='';
+  none.addEventListener('click',()=>setWall(''));
+  wg.appendChild(none);
   WALLS.forEach(u=>{
     const th=document.createElement('div');th.className='wth'+(u===cur?' act':'');
     th.style.backgroundImage=`url('${u}&w=400&q=55')`;th.dataset.url=u;
@@ -1450,11 +1468,30 @@ async function showQrCode(){
   if(errEl)  errEl.style.display  = 'none';
   if(noteEl) noteEl.style.display = 'none';
 
-  // GAS URL未設定 → デモQRを表示
   const isDemo = !gas || !isValidGasUrl(gas);
-  const base   = location.origin + location.pathname;
-  const url    = isDemo
-    ? base  // デモ：アプリURLのみ
+
+  // location.originが"null"（sandboxなど）の場合はGitHub Pages URLを使う
+  let origin = location.origin;
+  if(!origin || origin === 'null'){
+    origin = SS.get('ml_app_origin','');
+  }
+  if(!origin || origin === 'null'){
+    // originが取得できない場合：手動入力を促す
+    if(isDemo){
+      if(errEl){
+        errEl.textContent = '📋 アプリのURLが取得できません。GitHub Pages上で開いてQRを生成してください。';
+        errEl.style.display = 'block';
+      }
+      return;
+    }
+  } else {
+    // 正常なoriginは保存しておく（次回以降も使える）
+    SS.set('ml_app_origin', origin);
+  }
+
+  const base = origin + location.pathname;
+  const url  = isDemo
+    ? base
     : `${base}?gas=${encodeURIComponent(gas)}${token?'&token='+encodeURIComponent(token):''}`;
 
   container.innerHTML = '<div style="color:#999;font-size:.8rem;padding:20px;text-align:center">生成中...</div>';
@@ -1591,30 +1628,97 @@ function scanTick(){
 
 function onQrScanned(rawUrl){
   stopQrScan();
+
+  // ステップ①：スキャン成功通知
+  toast('📷 QRコードを検出しました...','ok');
+
+  // 少し待ってから処理（toastを見せるため）
+  setTimeout(()=>_processScannedUrl(rawUrl), 400);
+}
+
+function _processScannedUrl(rawUrl){
+  // ステップ②：URL解析
+  let parsed;
   try{
-    const parsed = new URL(rawUrl);
-    const gas    = parsed.searchParams.get('gas');
-    const token  = parsed.searchParams.get('token');
-    const wall   = parsed.searchParams.get('wall');
-
-    if(!gas || !isValidGasUrl(gas)){
-      toast('有効なメタモルQRコードではありません','err'); return;
-    }
-
-    // PWAのlocalStorageに直接保存
-    GAS_URL = gas;
-    SS.set('ml_gas', gas);
-    if(token)  SS.set('ml_gas_token', token);
-    if(wall && isSafeUrl(wall)) SS.set('ml_wall', wall);
-
-    toast('✅ QRコードを読み取りました。GASと同期します...','ok');
-
-    // 少し待ってから同期
-    setTimeout(() => syncFromGAS(), 600);
-
+    parsed = new URL(rawUrl);
   }catch(e){
-    toast('QRコードの解析に失敗しました','err');
+    _showScanError(
+      'URLの形式が正しくありません',
+      '読み取ったデータ: ' + rawUrl.slice(0,60) + (rawUrl.length>60?'...':'')
+    );
+    return;
   }
+
+  // ステップ③：パラメータ抽出
+  const gas   = parsed.searchParams.get('gas');
+  const token = parsed.searchParams.get('token');
+  const wall  = parsed.searchParams.get('wall');
+
+  if(!gas){
+    // gasパラメータなし → デモQRまたは別のQR
+    _showScanError(
+      'メタモルの設定QRコードではありません',
+      '「📤 QRを表示」で生成したQRコードをスキャンしてください。\nデモ表示用QRは設定情報を含みません。'
+    );
+    return;
+  }
+
+  // ステップ④：GAS URL検証
+  if(!isValidGasUrl(gas)){
+    _showScanError(
+      'GAS URLが正しくありません',
+      '読み取ったGAS URL: ' + gas.slice(0,50)
+    );
+    return;
+  }
+
+  // ステップ⑤：設定を保存
+  GAS_URL = gas;
+  SS.set('ml_gas', gas);
+  if(token)  SS.set('ml_gas_token', token);
+  if(wall && isSafeUrl(wall)) SS.set('ml_wall', wall);
+
+  toast('✅ 設定を保存しました。同期を開始します...','ok');
+
+  // ステップ⑥：GAS同期
+  setTimeout(async ()=>{
+    try{
+      await syncFromGAS();
+    }catch(e){
+      _showScanError('GAS同期に失敗しました', 'タブバーの「更新」ボタンで再試行してください');
+    }
+  }, 800);
+}
+
+function _showScanError(title, detail){
+  // モーダルを使ってエラーを目立つ形で表示
+  let errModal = document.getElementById('scan-err-modal');
+  if(!errModal){
+    errModal = document.createElement('div');
+    errModal.id = 'scan-err-modal';
+    errModal.style.cssText = `
+      position:fixed;inset:0;z-index:400;
+      display:flex;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.8);padding:24px;
+    `;
+    document.body.appendChild(errModal);
+  }
+  errModal.innerHTML = `
+    <div style="background:#0a0f0c;border:1px solid rgba(248,113,113,.4);border-radius:20px;
+                padding:28px 24px;max-width:320px;width:100%;text-align:center">
+      <div style="font-size:2rem;margin-bottom:12px">⚠️</div>
+      <div style="font-size:.95rem;font-weight:700;color:#f87171;margin-bottom:8px">${title}</div>
+      <div style="font-size:.75rem;color:rgba(255,255,255,.5);line-height:1.6;
+                  white-space:pre-wrap;margin-bottom:20px">${detail}</div>
+      <button onclick="document.getElementById('scan-err-modal').style.display='none'"
+        style="padding:10px 28px;border-radius:50px;border:1px solid rgba(52,211,153,.35);
+               background:rgba(52,211,153,.15);color:#34d399;font-size:.88rem;
+               font-weight:600;cursor:pointer;font-family:inherit">
+        閉じる
+      </button>
+    </div>
+  `;
+  errModal.style.display = 'flex';
 }
 
 function stopQrScan(){
