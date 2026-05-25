@@ -834,12 +834,22 @@ async function pushToGAS(entry){
       method:'POST',
       body:JSON.stringify({action:'add', token:getGasToken(), ...entry})
     });
-  }catch{}  // ⑩ サイレント失敗
+  }catch{}
 }
 async function deleteFromGAS(id){
   if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;
   try{
     await fetch(GAS_URL,{method:'POST',body:JSON.stringify({action:'delete',token:getGasToken(),id})});
+  }catch{}
+}
+// スロット移動をGASに反映（slot番号フィールドだけ更新）
+async function updateSlotInGAS(id, newSlot){
+  if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;
+  try{
+    await fetch(GAS_URL,{
+      method:'POST',
+      body:JSON.stringify({action:'update', token:getGasToken(), id, slot:newSlot})
+    });
   }catch{}
 }
 
@@ -999,8 +1009,12 @@ function dropAt(cx,cy){
   const si=el?.closest('.slot'); const di=si?parseInt(si.dataset.slot):-1;
   if(di>=0&&di!==drag.srcSlot){
     if(slots[di]===null){
-      slots[di]=slots[drag.srcSlot]; slots[drag.srcSlot]=null;
-      saveSlots(); toast(`コマ${drag.srcSlot+1}→コマ${di+1} 移動しました`,'ok');
+      const moved = slots[drag.srcSlot];
+      slots[di]=moved; slots[drag.srcSlot]=null;
+      saveSlots();
+      toast(`コマ${drag.srcSlot+1}→コマ${di+1} 移動しました`,'ok');
+      // GASのスロット番号を更新（管理者アイコン以外）
+      if(moved && !moved.isAdmin) updateSlotInGAS(moved.id, di);
     } else { toast('そのコマはすでに使用中です','err'); }
   }
   finishDrag();
