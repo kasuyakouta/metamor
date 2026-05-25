@@ -680,11 +680,10 @@ async function autoSyncOnStartup(){
     const adminSlot = slots.findIndex(s=>s&&s.isAdmin);
     const newSlots  = new Array(TOTAL_SLOTS).fill(null);
 
-    validEntries.forEach((lnk, i)=>{
-      // slot番号があれば使用、なければ配列インデックスをフォールバック
-      const sn = (lnk.slot !== undefined && !isNaN(parseInt(lnk.slot)))
-        ? parseInt(lnk.slot) : i;
-      if(sn >= 0 && sn < TOTAL_SLOTS && !newSlots[sn]){
+    // slot番号を使って正確な位置に配置（フォールバックなし）
+    validEntries.forEach((lnk)=>{
+      const sn = parseInt(lnk.slot);
+      if(!isNaN(sn) && sn >= 0 && sn < TOTAL_SLOTS && !newSlots[sn]){
         newSlots[sn] = lnk;
       }
     });
@@ -815,9 +814,11 @@ async function syncFromGAS(){
     if(json.status==='ok' && Array.isArray(json.data)){
       const adminSlot = slots.findIndex(s=>s&&s.isAdmin);
       slots = new Array(TOTAL_SLOTS).fill(null);
-      // ⑤ 各エントリを検証してから代入
-      json.data.forEach((lnk,i)=>{
-        if(i<TOTAL_SLOTS && validateEntry(lnk)) slots[i]=lnk;
+      // slot番号を使って正確な位置に配置
+      json.data.forEach((lnk)=>{
+        if(!validateEntry(lnk)) return;
+        const sn = parseInt(lnk.slot);
+        if(!isNaN(sn) && sn >= 0 && sn < TOTAL_SLOTS) slots[sn] = lnk;
       });
       const ai = adminSlot>=0 ? adminSlot : 23;
       if(!slots[ai]) slots[ai]={...ADMIN_ENTRY};
@@ -851,6 +852,32 @@ async function updateSlotInGAS(id, newSlot){
       body:JSON.stringify({action:'update', token:getGasToken(), id, slot:newSlot})
     });
   }catch{}
+}
+
+// 全スロットをGASに一括送信（スロット位置を完全に上書き）
+async function fullPushToGAS(){
+  if(!GAS_URL || !isValidGasUrl(GAS_URL)){
+    toast('GAS URLが設定されていません','err'); return;
+  }
+  const entries = slots
+    .map((s,i)=> s && !s.isAdmin ? {...s, slot:i} : null)
+    .filter(Boolean);
+
+  if(entries.length === 0){ toast('送信するアイコンがありません','err'); return; }
+
+  toast('⏳ GASに全データを送信中...');
+  try{
+    const res  = await fetch(GAS_URL,{
+      method:'POST',
+      body:JSON.stringify({action:'replaceAll', token:getGasToken(), entries})
+    });
+    const json = await res.json();
+    if(json.status==='ok'){
+      toast(`✅ ${json.count}件をGASに送信しました`,'ok');
+    } else {
+      toast('送信失敗: '+(json.message||'不明なエラー'),'err');
+    }
+  }catch(e){ toast('GAS接続エラー','err'); }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1323,7 +1350,8 @@ function buildSettingsPanel(){
       <input id="gas-token-input" type="password" value="${getGasToken()}"
         placeholder="任意の共通パスワード"/></div>
     <button class="btn-p" onclick="saveGasUrl()">💾 GAS URLを保存</button>
-    <button class="btn-p" style="margin-top:8px;background:rgba(14,165,233,.15);color:#38bdf8;border-color:rgba(14,165,233,.3)" onclick="syncFromGAS()">↓ GASから同期</button>
+    <button class="btn-p" style="margin-top:8px;background:rgba(14,165,233,.15);color:#38bdf8;border-color:rgba(14,165,233,.3)" onclick="syncFromGAS()">↓ GASから同期（上書き）</button>
+    <button class="btn-p" style="margin-top:8px;background:rgba(168,85,247,.15);color:#c084fc;border-color:rgba(168,85,247,.3)" onclick="fullPushToGAS()">↑ ローカル→GASに全送信（スロット修正）</button>
     <div class="hr"></div>
     <p class="sttl">📲 デバイス間で設定を共有</p>
     <p class="sttl-sub">【送り出し側】QRコードを表示 → 【受け取り側】このアプリ内でスキャン。カメラアプリではなくアプリ内スキャナーを使用してください。</p>
