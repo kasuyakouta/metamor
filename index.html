@@ -647,6 +647,8 @@ async function initSecurity(){
     applyUrlParams();
     loadWall();
     loadSlots();
+    // ① 起動時にGASから自動同期（GAS URLが設定済みの場合のみ）
+    autoSyncOnStartup();
   }
   ['touchstart','click','keydown'].forEach(ev=>{
     document.addEventListener(ev, ()=>SESSION.reset(), {passive:true});
@@ -655,6 +657,52 @@ async function initSecurity(){
     if(isAdmin){ e.preventDefault(); e.returnValue=''; }
   });
 })();
+
+// ═══════════════════════════════════════════════════════
+//  ① 起動時GAS自動同期
+//  GAS URLが設定済みの場合、起動直後にバックグラウンドで同期する。
+//  まずlocalStorageの内容を即時表示し（高速起動）、
+//  同期完了後に差分があれば静かに更新する。
+// ═══════════════════════════════════════════════════════
+async function autoSyncOnStartup(){
+  if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;  // GAS未設定なら何もしない
+
+  try{
+    const res  = await fetch(`${GAS_URL}?action=get&token=${encodeURIComponent(getGasToken())}`);
+    if(!res.ok) return;
+    const json = await res.json();
+    if(json.status !== 'ok' || !Array.isArray(json.data)) return;
+
+    // 現在のスロット状態と比較して差分があるときだけ更新
+    const adminSlot = slots.findIndex(s=>s&&s.isAdmin);
+    const newSlots  = new Array(TOTAL_SLOTS).fill(null);
+
+    json.data.forEach((lnk)=>{
+      if(!validateEntry(lnk)) return;
+      // スロット番号をGASデータから取得（なければ順番に埋める）
+      const slotNum = (lnk.slot !== undefined) ? parseInt(lnk.slot) : -1;
+      if(slotNum >= 0 && slotNum < TOTAL_SLOTS && !newSlots[slotNum]){
+        newSlots[slotNum] = lnk;
+      }
+    });
+
+    // 管理者アイコンを維持
+    const ai = adminSlot >= 0 ? adminSlot : 23;
+    if(!newSlots[ai]) newSlots[ai] = {...ADMIN_ENTRY};
+
+    // 差分チェック（JSON文字列で比較）
+    const changed = JSON.stringify(newSlots) !== JSON.stringify(slots);
+    if(changed){
+      slots = newSlots;
+      saveSlots();
+      render();
+      // 静かに更新（ユーザーが操作中でなければトーストも出さない）
+      if(!isAdmin) toast('🔄 最新データに更新しました','ok');
+    }
+  }catch(e){
+    // 起動時の自動同期は失敗してもサイレント（エラー表示しない）
+  }
+}
 
 // ═══════════════════════════════════════════════════════
 //  URLパラメータ自動設定
