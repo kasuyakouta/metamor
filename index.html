@@ -673,16 +673,19 @@ async function autoSyncOnStartup(){
     const json = await res.json();
     if(json.status !== 'ok' || !Array.isArray(json.data)) return;
 
-    // 現在のスロット状態と比較して差分があるときだけ更新
+    // GASに有効なエントリが0件なら上書きしない（ローカルデータを保護）
+    const validEntries = json.data.filter(lnk => validateEntry(lnk));
+    if(validEntries.length === 0) return;
+
     const adminSlot = slots.findIndex(s=>s&&s.isAdmin);
     const newSlots  = new Array(TOTAL_SLOTS).fill(null);
 
-    json.data.forEach((lnk)=>{
-      if(!validateEntry(lnk)) return;
-      // スロット番号をGASデータから取得（なければ順番に埋める）
-      const slotNum = (lnk.slot !== undefined) ? parseInt(lnk.slot) : -1;
-      if(slotNum >= 0 && slotNum < TOTAL_SLOTS && !newSlots[slotNum]){
-        newSlots[slotNum] = lnk;
+    validEntries.forEach((lnk, i)=>{
+      // slot番号があれば使用、なければ配列インデックスをフォールバック
+      const sn = (lnk.slot !== undefined && !isNaN(parseInt(lnk.slot)))
+        ? parseInt(lnk.slot) : i;
+      if(sn >= 0 && sn < TOTAL_SLOTS && !newSlots[sn]){
+        newSlots[sn] = lnk;
       }
     });
 
@@ -696,11 +699,10 @@ async function autoSyncOnStartup(){
       slots = newSlots;
       saveSlots();
       render();
-      // 静かに更新（ユーザーが操作中でなければトーストも出さない）
       if(!isAdmin) toast('🔄 最新データに更新しました','ok');
     }
   }catch(e){
-    // 起動時の自動同期は失敗してもサイレント（エラー表示しない）
+    // 起動時の自動同期は失敗してもサイレント
   }
 }
 
@@ -1425,7 +1427,7 @@ function saveLink(isEdit){
   const safeIcon = icon.startsWith('http://') ? icon.replace('http://','https://') : icon;
 
   const id=isEdit?slots[selSlot].id:('l'+Date.now());
-  const entry={id,name,url,icon:safeIcon,color:selCol};
+  const entry={id,name,url,icon:safeIcon,color:selCol,slot:selSlot}; // slot番号を含める
   slots[selSlot]=entry; saveSlots(); render(); closePanelUI();
   if(!isEdit) pushToGAS(entry);
   toast(`✅ ${isEdit?'更新':'追加'}しました（コマ${selSlot+1}）`,'ok');
