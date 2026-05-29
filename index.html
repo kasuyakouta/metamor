@@ -499,7 +499,14 @@ async function hashPin(pin){
 
 // PINハッシュ（initSecurity()で初期化）
 let ADMIN_PIN_HASH = '';
-let GAS_URL        = SS.get('ml_gas', '');
+// デフォルトGAS URL（初回起動時にlocalStorageが空でも自動適用）
+const DEFAULT_GAS_URL   = 'https://script.google.com/macros/s/AKfycbzU3lABLwfcCY3lLMaNDbCp0h9IaWIoRsV9XuO17d7AFLXogYTq0MdGBcII7gjnbMly/exec';
+const DEFAULT_GAS_TOKEN = 'metamor2026';
+
+// localStorageに未保存の場合はデフォルト値を適用
+if(!SS.get('ml_gas',''))  SS.set('ml_gas',   DEFAULT_GAS_URL);
+if(!SS.get('ml_gas_token','')) SS.set('ml_gas_token', DEFAULT_GAS_TOKEN);
+let GAS_URL = SS.get('ml_gas', DEFAULT_GAS_URL);
 const TOTAL_SLOTS  = 24;
 const ADMIN_ENTRY  = {id:'__admin__',name:'管理者',url:'',icon:'⚙️',color:'rgba(10,30,20,0.75)',isAdmin:true};
 
