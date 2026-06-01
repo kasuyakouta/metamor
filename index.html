@@ -876,6 +876,26 @@ async function updateSlotInGAS(id, newSlot){
   }catch{}
 }
 
+// エントリの全フィールドをGASに更新（編集時）
+async function updateEntryInGAS(entry){
+  if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;
+  try{
+    await fetch(GAS_URL,{
+      method:'POST',
+      body:JSON.stringify({
+        action:'update',
+        token: getGasToken(),
+        id:    entry.id,
+        name:  entry.name,
+        url:   entry.url,
+        icon:  entry.icon,
+        color: entry.color,
+        slot:  entry.slot,
+      })
+    });
+  }catch{}
+}
+
 // 全スロットをGASに一括送信（スロット位置を完全に上書き）
 async function fullPushToGAS(){
   if(!GAS_URL || !isValidGasUrl(GAS_URL)){
@@ -1714,18 +1734,22 @@ function saveLink(isEdit){
   if(!name){toast('アプリ名を入力してください','err');return;}
   if(!url) {toast('URLを入力してください','err');return;}
   if(!url.match(/^https?:\/\//i)) url='https://'+url;
-  // ⑥ URLバリデーション
   if(!isSafeUrl(url)){toast('https:// または http:// のURLを入力してください','err');return;}
   if(selSlot<0){toast('配置コマを選択してください','err');return;}
   if(!isEdit&&slots[selSlot]!==null){toast('そのコマはすでに使用中です','err');return;}
 
-  // ⑦ icon が http:// の場合 https:// に変換
-  const safeIcon = icon.startsWith('http://') ? icon.replace('http://','https://') : icon; // data:image/ はそのまま保存OK
+  const safeIcon = icon.startsWith('http://') ? icon.replace('http://','https://') : icon;
 
   const id=isEdit?slots[selSlot].id:('l'+Date.now());
-  const entry={id,name,url,icon:safeIcon,color:selCol,slot:selSlot}; // slot番号を含める
+  const entry={id,name,url,icon:safeIcon,color:selCol,slot:selSlot};
   slots[selSlot]=entry; saveSlots(); render(); closePanelUI();
-  if(!isEdit) pushToGAS(entry);
+
+  // 追加・編集どちらもGASに送信
+  if(!isEdit){
+    pushToGAS(entry);
+  } else {
+    updateEntryInGAS(entry); // 編集時はupdate
+  }
   toast(`✅ ${isEdit?'更新':'追加'}しました（コマ${selSlot+1}）`,'ok');
 }
 
