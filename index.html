@@ -50,11 +50,35 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
 #app{position:relative;z-index:1;min-height:100dvh;display:flex;flex-direction:column;
   padding-bottom:env(safe-area-inset-bottom,0px);background:#000}
 
-/* ── 管理者バー（iOSの「完了」バー） ── */
+/* ── 通常モード ヘッダー ── */
+#normal-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;
+  height:82px;          /* アイコン1行分と同じ高さ */
+  flex-shrink:0;
+}
+#app-title{
+  font-size:1rem;font-weight:700;color:var(--text);letter-spacing:.04em;
+}
+#btn-settings-entry{
+  padding:8px 20px;
+  border-radius:10px;border:1px solid rgba(52,211,153,.3);
+  background:rgba(52,211,153,.08);
+  color:var(--accent);font-size:.85rem;font-weight:600;
+  cursor:pointer;font-family:inherit;
+  -webkit-tap-highlight-color:transparent;
+  transition:background .15s;
+}
+#btn-settings-entry:active{background:rgba(52,211,153,.18)}
+#normal-bar.hide{display:none}
+
+/* ── 管理者バー（全ボタン上部集約） ── */
 #admin-bar{
   display:none;flex-shrink:0;
   align-items:center;justify-content:space-between;
-  padding:10px 18px;
+  height:82px;          /* アイコン1行分と同じ高さ */
+  padding:0 12px;
+  gap:6px;
   background:rgba(52,211,153,.1);
   border-bottom:1px solid rgba(52,211,153,.22);
   backdrop-filter:blur(12px);
@@ -63,9 +87,10 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
 @keyframes slideDown{from{opacity:0;transform:translateY(-100%)}to{opacity:1;transform:none}}
 #admin-bar.show{display:flex}
 #admin-bar-label{
-  display:flex;align-items:center;gap:7px;
-  font-size:.72rem;font-weight:700;letter-spacing:.08em;
+  display:flex;align-items:center;gap:6px;
+  font-size:.70rem;font-weight:700;letter-spacing:.06em;
   text-transform:uppercase;color:var(--accent);
+  flex-shrink:0;
 }
 .admin-bar-dot{
   width:7px;height:7px;border-radius:50%;
@@ -73,18 +98,39 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
   box-shadow:0 0 8px rgba(52,211,153,.7);
   animation:pulse 2s ease-in-out infinite;
 }
+/* 上部バーのアクションボタン群 */
+#admin-bar-actions{
+  display:flex;align-items:center;gap:5px;flex-shrink:0;
+}
+.admin-top-btn{
+  padding:8px 18px;
+  border:1px solid rgba(52,211,153,.25);
+  border-radius:10px;cursor:pointer;
+  background:rgba(52,211,153,.08);
+  color:rgba(52,211,153,.8);
+  font-family:inherit;font-size:.85rem;font-weight:600;
+  letter-spacing:.02em;white-space:nowrap;
+  transition:background .15s,color .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.admin-top-btn:hover{background:rgba(52,211,153,.15);color:var(--accent)}
+.admin-top-btn:active{background:rgba(52,211,153,.22)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 #btn-done{
-  padding:6px 18px;border-radius:20px;
-  background:var(--accent);color:#06120a;
-  border:none;font-size:.82rem;font-weight:700;
+  padding:8px 20px;border-radius:10px;
+  background:rgba(52,211,153,.25);
+  color:var(--accent);
+  border:1px solid rgba(52,211,153,.5);
+  font-size:.85rem;font-weight:700;
   cursor:pointer;letter-spacing:.02em;font-family:inherit;
   transition:background .15s,transform .1s;
+  white-space:nowrap;
+  -webkit-tap-highlight-color:transparent;
 }
-#btn-done:active{transform:scale(.95)}
+#btn-done:active{transform:scale(.95);background:rgba(52,211,153,.4)}
 
 /* ── GRID ── */
-#grid-wrap{flex:1;overflow-y:auto;padding:10px 16px 44px;-webkit-overflow-scrolling:touch;background:#000}
+#grid-wrap{flex:1;overflow-y:auto;padding:8px 16px env(safe-area-inset-bottom,20px);-webkit-overflow-scrolling:touch;background:#000}
 #icon-grid.admin-active{padding-bottom:80px}
 #grid-wrap::-webkit-scrollbar{width:3px}
 #grid-wrap::-webkit-scrollbar-thumb{background:rgba(52,211,153,.15);border-radius:3px}
@@ -214,13 +260,14 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
   transition:opacity .3s,transform .3s cubic-bezier(.32,0,.18,1);
 }
 #tabbar.admin-mode{
-  opacity:1;pointer-events:auto;transform:translateY(0);
+  opacity:0;pointer-events:none;transform:translateY(100%);
+  /* 全ボタンを上部バーに集約したため下部タブバーは非表示 */
 }
 .tab-item{
   flex:1;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:4px;
-  padding:10px 4px 10px;
+  padding:10px 8px 10px;
   cursor:pointer;
   border:none;background:transparent;
   color:rgba(52,211,153,.45);
@@ -239,7 +286,7 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
 .tab-item:active{background:rgba(52,211,153,.1)}
 .tab-item.tab-active{color:var(--accent)}
 .tab-item.tab-active::before{opacity:1}
-.tab-item.tab-done{color:rgba(52,211,153,.7)}
+.tab-item.tab-done{display:none}
 .tab-icon{
   width:26px;height:26px;
   display:flex;align-items:center;justify-content:center;
@@ -379,13 +426,23 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
 <body>
 <div id="bg"></div>
 <div id="app">
-  <!-- 管理者バー -->
+  <!-- 通常モード ヘッダー -->
+  <div id="normal-bar">
+    <div id="app-title">メタモル</div>
+    <button id="btn-settings-entry" onclick="openPwModal()">設定</button>
+  </div>
+  <!-- 管理者バー（テキストのみ・シンプル） -->
   <div id="admin-bar">
     <div id="admin-bar-label">
       <div class="admin-bar-dot"></div>
-      編集モード
+      編集中
     </div>
-    <button id="btn-done" onclick="exitAdmin()">完了</button>
+    <div id="admin-bar-actions">
+      <button class="admin-top-btn" onclick="syncFromGAS()">更新</button>
+      <button class="admin-top-btn" onclick="openPanel('wallpaper')">壁紙</button>
+      <button class="admin-top-btn" onclick="openPanel('settings')">設定</button>
+      <button class="admin-top-btn" id="btn-done" onclick="exitAdmin()">完了</button>
+    </div>
   </div>
   <div id="grid-wrap">
     <div id="icon-grid"></div>
@@ -412,12 +469,7 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
     </div>
     <div class="tab-label">設定</div>
   </button>
-  <button class="tab-item tab-done" onclick="exitAdmin()">
-    <div class="tab-icon">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-    </div>
-    <div class="tab-label">完了</div>
-  </button>
+
 </div>
 
 <div id="toast"></div>
@@ -514,7 +566,7 @@ const DEFAULT_GAS_TOKEN = 'metamor2026';
 if(!SS.get('ml_gas',''))  SS.set('ml_gas',   DEFAULT_GAS_URL);
 if(!SS.get('ml_gas_token','')) SS.set('ml_gas_token', DEFAULT_GAS_TOKEN);
 let GAS_URL = SS.get('ml_gas', DEFAULT_GAS_URL);
-const TOTAL_SLOTS  = 32;
+const TOTAL_SLOTS  = 28;
 const ADMIN_ENTRY  = {id:'__admin__',name:'管理者',url:'',icon:'⚙️',color:'rgba(10,30,20,0.75)',isAdmin:true};
 
 // ③ ブルートフォース保護
@@ -694,7 +746,7 @@ async function initSecurity(){
 //  同期完了後に差分があれば静かに更新する。
 // ═══════════════════════════════════════════════════════
 async function autoSyncOnStartup(){
-  if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;  // GAS未設定なら何もしない
+  if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;
 
   try{
     const res  = await fetch(`${GAS_URL}?action=get&token=${encodeURIComponent(getGasToken())}`);
@@ -702,26 +754,47 @@ async function autoSyncOnStartup(){
     const json = await res.json();
     if(json.status !== 'ok' || !Array.isArray(json.data)) return;
 
-    // GASに有効なエントリが0件なら上書きしない（ローカルデータを保護）
     const validEntries = json.data.filter(lnk => validateEntry(lnk));
     if(validEntries.length === 0) return;
 
-    const adminSlot = slots.findIndex(s=>s&&s.isAdmin);
-    const newSlots  = new Array(TOTAL_SLOTS).fill(null);
-
-    // slot番号を使って正確な位置に配置（フォールバックなし）
+    // GASデータをslot番号で配置
+    const gasSlots = new Array(TOTAL_SLOTS).fill(null);
+    const overflow = []; // TOTAL_SLOTS以上のスロット番号のデータ
     validEntries.forEach((lnk)=>{
+      if(lnk.isAdmin) return;
       const sn = parseInt(lnk.slot);
-      if(!isNaN(sn) && sn >= 0 && sn < TOTAL_SLOTS && !newSlots[sn]){
-        newSlots[sn] = lnk;
+      if(isNaN(sn)) return;
+      if(sn >= 0 && sn < TOTAL_SLOTS){
+        if(!gasSlots[sn]) gasSlots[sn] = lnk;
+      } else {
+        overflow.push(lnk); // 範囲外（旧32スロット分）は別処理
       }
     });
+    // あふれたデータを空きスロットに移動
+    overflow.forEach(lnk => {
+      const emptyIdx = gasSlots.findIndex(s => !s);
+      if(emptyIdx >= 0) gasSlots[emptyIdx] = {...lnk, slot: emptyIdx};
+    });
 
-    // 管理者アイコンを維持
-    const ai = adminSlot >= 0 ? adminSlot : 23;
-    if(!newSlots[ai]) newSlots[ai] = {...ADMIN_ENTRY};
+    // ── スマートマージ：ローカルデータを保護 ──
+    // GASにあるスロット → GASを優先（マルチデバイス同期）
+    // GASにない＆ローカルにある → ローカルを保護（クラッシュ前の変更を保持）
+    const newSlots = new Array(TOTAL_SLOTS).fill(null);
+    for(let i=0; i<TOTAL_SLOTS; i++){
+      if(slots[i] && slots[i].isAdmin) continue; // 管理者は後で処理
+      if(gasSlots[i]){
+        // GASに__local_image__が来た場合はローカルの画像を保持
+        if(gasSlots[i].icon === '__local_image__' && slots[i] && slots[i].icon){
+          newSlots[i] = {...gasSlots[i], icon: slots[i].icon};
+        } else {
+          newSlots[i] = gasSlots[i];
+        }
+      }
+      else if(slots[i])     newSlots[i] = slots[i];     // ローカルを保護
+    }
 
-    // 差分チェック（JSON文字列で比較）
+    // 管理者アイコン廃止（配置不要）
+
     const changed = JSON.stringify(newSlots) !== JSON.stringify(slots);
     if(changed){
       slots = newSlots;
@@ -730,7 +803,7 @@ async function autoSyncOnStartup(){
       if(!isAdmin) toast('🔄 最新データに更新しました','ok');
     }
   }catch(e){
-    // 起動時の自動同期は失敗してもサイレント
+    // サイレント失敗
   }
 }
 
@@ -808,7 +881,27 @@ function loadSlots(){
   const saved = SS.getObj('ml_slots', null);
   if(saved && Array.isArray(saved)){
     slots = new Array(TOTAL_SLOTS).fill(null);
-    saved.forEach((v,i)=>{ if(i<TOTAL_SLOTS) slots[i]=v; });
+
+    // 既存スロットをコピー（TOTAL_SLOTS範囲内）
+    saved.forEach((v,i)=>{
+      if(i < TOTAL_SLOTS && v && !v.isAdmin && validateEntry(v)){
+        slots[i] = v;
+      }
+    });
+
+    // スロット数が減った場合（32→28）: あふれたデータを空きスロットに移動
+    if(saved.length > TOTAL_SLOTS){
+      for(let i = TOTAL_SLOTS; i < saved.length; i++){
+        const v = saved[i];
+        if(!v || v.isAdmin || !validateEntry(v)) continue;
+        const emptyIdx = slots.findIndex(s => !s);
+        if(emptyIdx >= 0){
+          slots[emptyIdx] = {...v, slot: emptyIdx};
+        }
+        // 空きがなければ警告のみ（データは次回全送信で整理）
+      }
+    }
+
     ensureAdminIcon();
   } else { initDefault(); }
   render();
@@ -816,16 +909,18 @@ function loadSlots(){
 function initDefault(){
   slots = new Array(TOTAL_SLOTS).fill(null);
   DEMO.forEach((l,i)=>{ slots[i]=l; });
-  slots[23] = {...ADMIN_ENTRY};
   saveSlots();
 }
 function ensureAdminIcon(){
-  if(slots.some(s=>s&&s.isAdmin)) return;
-  if(!slots[31]) slots[31]={...ADMIN_ENTRY};
-  else{ const i=slots.findIndex(s=>!s); if(i>=0) slots[i]={...ADMIN_ENTRY}; }
-  saveSlots();
+  // 管理者アイコン廃止（設定は上部バーから操作）
+  // 既存データに管理者アイコンがある場合は削除
+  const ai = slots.findIndex(s=>s&&s.isAdmin);
+  if(ai >= 0){ slots[ai]=null; saveSlots(); }
 }
-function saveSlots(){ SS.setObj('ml_slots', slots); }
+function saveSlots(){
+  SS.setObj('ml_slots', slots);
+  SS.set('ml_slots_ver', String(TOTAL_SLOTS)); // スロット数バージョン
+}
 
 // ═══════════════════════════════════════════════════════
 //  ② GAS連携（リクエストトークン付き）
@@ -859,12 +954,22 @@ async function syncFromGAS(){
 
 async function pushToGAS(entry){
   if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;
+  // 画像データはGASに送らない（セル容量・クラッシュ防止）
+  const gasEntry = {...entry};
+  if(gasEntry.icon && gasEntry.icon.startsWith('data:image/'))
+    gasEntry.icon = '__local_image__'; // ローカル画像は参照のみ
   try{
-    await fetch(GAS_URL,{
+    const res = await fetch(GAS_URL,{
       method:'POST',
-      body:JSON.stringify({action:'add', token:getGasToken(), ...entry})
+      body:JSON.stringify({action:'add', token:getGasToken(), ...gasEntry})
     });
-  }catch{}
+    const json = await res.json();
+    if(json.status !== 'ok'){
+      toast('⚠ GAS保存に失敗しました（ローカルには保存済）','err');
+    }
+  }catch{
+    toast('⚠ GAS接続エラー（ローカルには保存済）','err');
+  }
 }
 async function deleteFromGAS(id){
   if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;
@@ -886,8 +991,11 @@ async function updateSlotInGAS(id, newSlot){
 // エントリの全フィールドをGASに更新（編集時）
 async function updateEntryInGAS(entry){
   if(!GAS_URL || !isValidGasUrl(GAS_URL)) return;
+  // 画像データはGASに送らない（ローカル保存のみ）
+  const iconForGas = (entry.icon && entry.icon.startsWith('data:image/'))
+    ? '__local_image__' : entry.icon;
   try{
-    await fetch(GAS_URL,{
+    const res = await fetch(GAS_URL,{
       method:'POST',
       body:JSON.stringify({
         action:'update',
@@ -895,12 +1003,18 @@ async function updateEntryInGAS(entry){
         id:    entry.id,
         name:  entry.name,
         url:   entry.url,
-        icon:  entry.icon,
+        icon:  iconForGas,
         color: entry.color,
         slot:  entry.slot,
       })
     });
-  }catch{}
+    const json = await res.json();
+    if(json.status !== 'ok'){
+      toast('⚠ GAS更新に失敗しました（ローカルには保存済）','err');
+    }
+  }catch{
+    toast('⚠ GAS接続エラー（ローカルには保存済）','err');
+  }
 }
 
 // 全スロットをGASに一括送信（スロット位置を完全に上書き）
@@ -1191,7 +1305,7 @@ document.getElementById('icon-grid').addEventListener('click',e=>{
   }
   // 通常モード
   if(!slots[si]) return;
-  if(slots[si].isAdmin){openPwModal();return;}
+  if(slots[si] && slots[si].isAdmin){openPwModal();return;} // 管理者アイコン廃止済み
   if(isSafeUrl(slots[si].url)) window.open(slots[si].url,'_blank','noopener,noreferrer');
 });
 
@@ -1200,6 +1314,8 @@ document.getElementById('icon-grid').addEventListener('click',e=>{
 // ═══════════════════════════════════════════════════════
 function enterAdmin(){
   isAdmin=true;
+  document.getElementById('normal-bar').classList.add('hide');
+  // タブバー非表示のため余白追加不要
   document.getElementById('admin-bar').classList.add('show');
   document.getElementById('tabbar').classList.add('admin-mode');
   SESSION.reset();  // ⑨ タイムアウト開始
@@ -1208,9 +1324,11 @@ function enterAdmin(){
 }
 function exitAdmin(){
   isAdmin=false;
+  document.getElementById('normal-bar').classList.remove('hide');
+  document.getElementById('grid-wrap').style.paddingBottom='';
   document.getElementById('admin-bar').classList.remove('show');
   document.getElementById('tabbar').classList.remove('admin-mode');
-  SESSION.clear();  // ⑨ タイムアウトキャンセル
+  SESSION.clear();
   closePanelUI(); render();
   toast('完了しました');
 }
@@ -1511,7 +1629,14 @@ function buildSettingsPanel(){
     <div style="display:flex;gap:8px">
       <button class="btn-danger" style="margin-top:0;flex:1" onclick="resetData()">↺ 初期化</button>
       <button class="btn-danger" style="margin-top:0;flex:1;background:rgba(248,113,113,.2)" onclick="exportData()">📤 エクスポート</button>
-    </div>`;
+    </div>
+    <div class="hr"></div>
+    <button onclick="closePanelUI();exitAdmin();"
+      style="width:100%;padding:14px;border-radius:12px;border:1px solid rgba(52,211,153,.35);
+      background:rgba(52,211,153,.12);color:var(--accent);font-size:.95rem;font-weight:700;
+      cursor:pointer;font-family:inherit;letter-spacing:.06em">
+      編集モードを終了する
+    </button>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1537,24 +1662,49 @@ function pickCol(h,el){
 // ═══════════════════════════════════════════════════════
 
 // 画像をCanvas経由で60×60px base64に縮小変換
+// 画像をCanvas経由で65×65px base64に縮小変換
+// ※ createObjectURL を使用（readAsDataURL より大幅に省メモリ）
 function resizeImageToBase64(file, callback){
-  const reader = new FileReader();
-  reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
+  // ファイルサイズチェック（100MB超はスキップ）
+  if(file.size > 100 * 1024 * 1024){
+    toast('画像ファイルが大きすぎます（100MB以下を選択してください）','err');
+    return;
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = () => {
+    try{
       const canvas = document.createElement('canvas');
-      canvas.width = 60; canvas.height = 60;
+      const SIZE = 65;
+      canvas.width  = SIZE;
+      canvas.height = SIZE;
       const ctx = canvas.getContext('2d');
-      // 中央クロップ
-      const s = Math.min(img.width, img.height);
+
+      // 中央正方形クロップ
+      const s  = Math.min(img.width, img.height);
       const ox = (img.width  - s) / 2;
       const oy = (img.height - s) / 2;
-      ctx.drawImage(img, ox, oy, s, s, 0, 0, 60, 60);
-      callback(canvas.toDataURL('image/jpeg', 0.85));
-    };
-    img.src = e.target.result;
+      ctx.drawImage(img, ox, oy, s, s, 0, 0, SIZE, SIZE);
+
+      const b64 = canvas.toDataURL('image/jpeg', 0.80);
+      callback(b64);
+    }catch(e){
+      toast('画像の変換に失敗しました','err');
+    }finally{
+      // メモリを解放
+      URL.revokeObjectURL(objectUrl);
+      img.src = '';
+    }
   };
-  reader.readAsDataURL(file);
+
+  img.onerror = () => {
+    URL.revokeObjectURL(objectUrl);
+    toast('画像を読み込めませんでした','err');
+  };
+
+  img.src = objectUrl;
 }
 
 // アイコン入力フィールド（絵文字/URL/アップロード/貼り付けタブ）
@@ -1627,12 +1777,31 @@ function buildIconField(initialValue=''){
   });
 
   function processFile(file){
+    // 画像でないファイルをスキップ
+    if(!file.type.startsWith('image/')){
+      toast('画像ファイルを選択してください','err'); return;
+    }
+    // ローディング表示
+    uploadArea.querySelector('div:first-child').textContent='⏳';
+    uploadArea.style.pointerEvents = 'none';
+
     resizeImageToBase64(file, b64=>{
-      hidden.value=b64; livePrev();
-      thumbUp.src=b64; thumbUp.style.display='block';
-      uploadArea.querySelector('div:first-child').textContent='✅';
+      hidden.value = b64;
+      livePrev();
+      thumbUp.src  = b64;
+      thumbUp.style.display = 'block';
+      uploadArea.querySelector('div:first-child').textContent = '✅';
+      uploadArea.style.pointerEvents = '';
       toast('✅ 画像を読み込みました','ok');
     });
+
+    // 3秒後にローディングが終わらない場合はリセット
+    setTimeout(()=>{
+      if(uploadArea.querySelector('div:first-child').textContent === '⏳'){
+        uploadArea.querySelector('div:first-child').textContent = '📁';
+        uploadArea.style.pointerEvents = '';
+      }
+    }, 3000);
   }
 
   panelUpload.append(fileInput, uploadArea, thumbUp);
