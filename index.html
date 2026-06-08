@@ -48,6 +48,8 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
 
 /* ── LAYOUT ── */
 #app{position:relative;z-index:1;min-height:100dvh;display:flex;flex-direction:column;
+  /* C案: セーフエリア + 最小余白を保証（ステータスバーと重ならない） */
+  padding-top:calc(env(safe-area-inset-top, 0px) + 12px);
   padding-bottom:env(safe-area-inset-bottom,0px);background:#000}
 
 /* ── 通常モード ヘッダー ── */
