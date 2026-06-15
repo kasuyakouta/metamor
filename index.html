@@ -1825,18 +1825,29 @@ function buildIconField(initialValue=''){
         let inputUrl=urlInp.value.trim();
         if(!inputUrl){toast('URLを入力してください','err');return;}
         if(!inputUrl.startsWith('http'))inputUrl='https://'+inputUrl;
-        let domain;
-        try{domain=new URL(inputUrl).hostname;}catch(e){toast('URLが正しくありません','err');return;}
+        let domain,basePath;
+        try{
+          const parsed=new URL(inputUrl);
+          domain=parsed.hostname;
+          // サブパス: 末尾スラッシュを保証してベースURLとして使う
+          const p=parsed.pathname.endsWith('/')?parsed.pathname:parsed.pathname+'/';
+          basePath=`${parsed.origin}${p}`;
+        }catch(e){toast('URLが正しくありません','err');return;}
         fetchBtn.textContent='取得中...';fetchBtn.disabled=true;
         previewArea.style.display='none';previewArea.innerHTML='';
         const candidates=[
+          // サブパス直下を優先
+          {url:`${basePath}apple-touch-icon.png`,label:'apple-touch-icon(path)'},
+          {url:`${basePath}icons/icon-180.png`,label:'icons/icon-180'},
+          {url:`${basePath}icons/icon-192.png`,label:'icons/icon-192'},
+          {url:`${basePath}icons/apple-touch-icon.png`,label:'icons/apple-touch'},
+          {url:`${basePath}favicon.png`,label:'favicon(path)'},
+          // ドメインルート
           {url:`https://${domain}/apple-touch-icon.png`,label:'apple-touch-icon'},
-          {url:`https://${domain}/apple-touch-icon-precomposed.png`,label:'precomposed'},
           {url:`https://${domain}/apple-touch-icon-180x180.png`,label:'180×180'},
-          {url:`https://${domain}/apple-touch-icon-152x152.png`,label:'152×152'},
-          {url:`https://${domain}/apple-touch-icon-120x120.png`,label:'120×120'},
           {url:`https://${domain}/favicon.png`,label:'favicon.png'},
           {url:`https://${domain}/favicon.ico`,label:'favicon.ico'},
+          // 外部サービス
           {url:`https://icons.duckduckgo.com/ip3/${domain}.ico`,label:'DuckDuckGo'},
           {url:`https://www.google.com/s2/favicons?domain=${domain}&sz=256`,label:'Favicon 256px'},
           {url:`https://www.google.com/s2/favicons?domain=${domain}&sz=128`,label:'Favicon 128px'},
