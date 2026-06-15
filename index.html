@@ -1833,8 +1833,14 @@ function buildIconField(initialValue=''){
           {url:`https://${domain}/apple-touch-icon.png`,label:'apple-touch-icon'},
           {url:`https://${domain}/apple-touch-icon-precomposed.png`,label:'precomposed'},
           {url:`https://${domain}/apple-touch-icon-180x180.png`,label:'180×180'},
+          {url:`https://${domain}/apple-touch-icon-152x152.png`,label:'152×152'},
+          {url:`https://${domain}/apple-touch-icon-120x120.png`,label:'120×120'},
+          {url:`https://${domain}/favicon.png`,label:'favicon.png'},
+          {url:`https://${domain}/favicon.ico`,label:'favicon.ico'},
+          {url:`https://icons.duckduckgo.com/ip3/${domain}.ico`,label:'DuckDuckGo'},
+          {url:`https://www.google.com/s2/favicons?domain=${domain}&sz=256`,label:'Favicon 256px'},
           {url:`https://www.google.com/s2/favicons?domain=${domain}&sz=128`,label:'Favicon 128px'},
-          {url:`https://www.google.com/s2/favicons?domain=${domain}&sz=64`,label:'Favicon 64px'},
+          {url:`https://logo.clearbit.com/${domain}`,label:'Clearbit Logo'},
         ];
         previewArea.style.display='block';
         const pttl=document.createElement('p');pttl.style.cssText='font-size:.72rem;color:rgba(52,211,153,.5);margin:0 0 8px';pttl.textContent='候補アイコン（タップして選択）：';
