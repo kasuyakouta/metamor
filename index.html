@@ -1848,7 +1848,7 @@ function buildIconField(initialValue=''){
         previewArea.append(pttl,grid);
         let loaded=0;
         candidates.forEach(({url:iconUrl,label:iconLabel})=>{
-          const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer';
+          const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;-webkit-tap-highlight-color:transparent';
           const img=document.createElement('img');img.src=iconUrl;
           img.style.cssText='width:56px;height:56px;border-radius:12px;object-fit:cover;border:2px solid rgba(52,211,153,.15);transition:border-color .2s,box-shadow .2s;background:#111';img.alt='';
           img.onload=()=>{loaded++;if(loaded===1){fetchBtn.textContent='取得';fetchBtn.disabled=false;}};
@@ -1859,6 +1859,11 @@ function buildIconField(initialValue=''){
             grid.querySelectorAll('img').forEach(i=>{i.style.borderColor='rgba(52,211,153,.15)';i.style.boxShadow='none';});
             img.style.borderColor='var(--accent)';img.style.boxShadow='0 0 0 2px rgba(52,211,153,.35)';
             toast('✅ アイコンを選択しました','ok');
+            // 選択後にアコーディオンを閉じる
+            setTimeout(()=>{
+              acc.querySelectorAll('.icon-acc-row').forEach(r=>r.classList.remove('open'));
+              acc.querySelectorAll('.icon-acc-body').forEach(b=>b.style.display='none');
+            },400);
           });
           wrap.append(img,ilbl);grid.appendChild(wrap);
         });
