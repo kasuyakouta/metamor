@@ -418,6 +418,30 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
 .num-btn.cancel-btn{font-size:.72rem;color:rgba(255,255,255,.3)}
 #pw-error{font-size:.72rem;color:var(--danger);margin-top:10px;min-height:1em;text-align:center}
 
+.icon-acc{border:1px solid rgba(52,211,153,.15);border-radius:12px;overflow:hidden;margin-top:4px}
+.icon-acc-row{border-bottom:1px solid rgba(52,211,153,.08)}
+.icon-acc-row:last-child{border-bottom:none}
+.icon-acc-hdr{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent}
+.icon-acc-hdr:hover{background:rgba(52,211,153,.05)}
+.icon-acc-hdr:active{background:rgba(52,211,153,.1)}
+.icon-acc-em{font-size:1.1rem;flex-shrink:0}
+.icon-acc-ttl{flex:1;font-size:.84rem;font-weight:500;color:var(--text)}
+.icon-acc-arr{font-size:.65rem;color:rgba(52,211,153,.4);transition:transform .2s;flex-shrink:0}
+.icon-acc-row.open .icon-acc-arr{transform:rotate(90deg);color:var(--accent)}
+.icon-acc-row.open .icon-acc-hdr{background:rgba(52,211,153,.06)}
+.icon-acc-body{padding:0 14px 14px;background:rgba(52,211,153,.02)}
+.icon-acc-input{width:100%;padding:10px 12px;background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.15);border-radius:10px;color:var(--text);font-size:.87rem;outline:none;transition:border-color .2s;font-family:inherit;-webkit-appearance:none;appearance:none}
+.icon-acc-input:focus{border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.08)}
+.icon-acc-drop{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;padding:18px 14px;border:1.5px dashed rgba(52,211,153,.3);border-radius:10px;cursor:pointer;background:rgba(52,211,153,.03);transition:background .15s,border-color .15s}
+.icon-acc-drop:active,.icon-acc-drop.dragover{background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.6)}
+.icon-acc-drop-txt{font-size:.75rem;color:rgba(52,211,153,.55)}
+.icon-acc-thumb{width:56px;height:56px;border-radius:12px;object-fit:cover;margin-top:10px;border:1px solid rgba(52,211,153,.2);display:block}
+.icon-acc-paste-btn{width:100%;padding:14px;border-radius:10px;border:1.5px dashed rgba(52,211,153,.3);background:rgba(52,211,153,.04);color:rgba(52,211,153,.7);font-size:.82rem;cursor:pointer;font-family:inherit;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.icon-acc-paste-btn:active{background:rgba(52,211,153,.12)}
+.icon-acc-fetch-btn{padding:10px 16px;border-radius:10px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);color:var(--accent);font-size:.82rem;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s;-webkit-tap-highlight-color:transparent;flex-shrink:0}
+.icon-acc-fetch-btn:disabled{opacity:.5;pointer-events:none}
+.icon-acc-fetch-btn:active{background:rgba(52,211,153,.25)}
+.icon-acc-site-preview{margin-top:12px;padding:12px;background:rgba(52,211,153,.03);border:1px solid rgba(52,211,153,.1);border-radius:10px}
 @media(max-width:390px){
   #icon-grid{column-gap:8px;row-gap:8px}
   #grid-wrap{padding:8px 14px 100px}
@@ -1659,206 +1683,201 @@ function pickCol(h,el){
 
 // ④ livePrev: innerHTML排除・DOM操作のみ
 
-// ═══════════════════════════════════════════════════════
-//  🖼 アイコン画像アップロード・貼り付け機能
-// ═══════════════════════════════════════════════════════
-
-// 画像をCanvas経由で60×60px base64に縮小変換
-// 画像をCanvas経由で65×65px base64に縮小変換
-// ※ createObjectURL を使用（readAsDataURL より大幅に省メモリ）
-function resizeImageToBase64(file, callback){
-  // ファイルサイズチェック（100MB超はスキップ）
-  if(file.size > 100 * 1024 * 1024){
-    toast('画像ファイルが大きすぎます（100MB以下を選択してください）','err');
-    return;
-  }
-
-  const objectUrl = URL.createObjectURL(file);
-  const img = new Image();
-
-  img.onload = () => {
-    try{
-      const canvas = document.createElement('canvas');
-      const SIZE = 65;
-      canvas.width  = SIZE;
-      canvas.height = SIZE;
-      const ctx = canvas.getContext('2d');
-
-      // 中央正方形クロップ
-      const s  = Math.min(img.width, img.height);
-      const ox = (img.width  - s) / 2;
-      const oy = (img.height - s) / 2;
-      ctx.drawImage(img, ox, oy, s, s, 0, 0, SIZE, SIZE);
-
-      const b64 = canvas.toDataURL('image/jpeg', 0.80);
-      callback(b64);
-    }catch(e){
-      toast('画像の変換に失敗しました','err');
-    }finally{
-      // メモリを解放
-      URL.revokeObjectURL(objectUrl);
-      img.src = '';
-    }
-  };
-
-  img.onerror = () => {
-    URL.revokeObjectURL(objectUrl);
-    toast('画像を読み込めませんでした','err');
-  };
-
-  img.src = objectUrl;
+function _processIconFile(file,hidden,area,thumb){
+  if(!file.type.startsWith('image/')){toast('画像ファイルを選択してください','err');return;}
+  const txt=area.querySelector('.icon-acc-drop-txt');
+  if(txt)txt.textContent='⏳ 変換中...';
+  area.style.pointerEvents='none';
+  resizeImageToBase64(file,b64=>{
+    hidden.value=b64;livePrev();
+    thumb.src=b64;thumb.style.display='block';
+    if(txt)txt.textContent='✅ 完了（変更はタップ）';
+    area.style.pointerEvents='';
+    toast('✅ 画像を読み込みました','ok');
+  });
+  setTimeout(()=>{
+    if(txt&&txt.textContent==='⏳ 変換中...'){txt.textContent='タップして画像を選択';area.style.pointerEvents='';}
+  },3000);
 }
 
-// アイコン入力フィールド（絵文字/URL/アップロード/貼り付けタブ）
-function buildIconField(initialValue=''){
-  const fg = document.createElement('div'); fg.className='fg';
-  const lbl = document.createElement('label'); lbl.textContent='アイコン';
-  fg.appendChild(lbl);
-
-  // タブ
-  const tabs = document.createElement('div'); tabs.className='icon-upload-tabs';
-  const tabEmoji  = document.createElement('button'); tabEmoji.className='icon-tab active';  tabEmoji.textContent='😀 絵文字';   tabEmoji.type='button';
-  const tabUrl    = document.createElement('button'); tabUrl.className='icon-tab';            tabUrl.textContent='🔗 URL';        tabUrl.type='button';
-  const tabUpload = document.createElement('button'); tabUpload.className='icon-tab';         tabUpload.textContent='📁 ファイル'; tabUpload.type='button';
-  const tabPaste  = document.createElement('button'); tabPaste.className='icon-tab';          tabPaste.textContent='📋 貼り付け'; tabPaste.type='button';
-  tabs.append(tabEmoji, tabUrl, tabUpload, tabPaste);
-  fg.appendChild(tabs);
-
-  // 共通の隠しフィールド（実際の値を保持）
-  const hidden = document.createElement('input');
-  hidden.type='hidden'; hidden.id='fi';
-  hidden.value = initialValue;
-  fg.appendChild(hidden);
-
-  // ── 各タブのコンテンツ ──
-  // 絵文字パネル
-  const panelEmoji = document.createElement('div');
-  const emojiInp = document.createElement('input');
-  emojiInp.type='text'; emojiInp.placeholder='🌿 絵文字を入力';
-  emojiInp.className=''; emojiInp.style.cssText='width:100%;padding:10px 12px;background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.15);border-radius:10px;color:var(--text);font-size:1.5rem;outline:none;font-family:inherit';
-  if(initialValue && !initialValue.startsWith('http') && !initialValue.startsWith('data:'))
-    emojiInp.value = initialValue;
-  emojiInp.addEventListener('input', ()=>{ hidden.value=emojiInp.value; livePrev(); });
-  panelEmoji.appendChild(emojiInp);
-
-  // URLパネル
-  const panelUrl = document.createElement('div'); panelUrl.style.display='none';
-  const urlInp = document.createElement('input');
-  urlInp.type='url'; urlInp.placeholder='https://example.com/icon.png';
-  urlInp.style.cssText='width:100%;padding:10px 12px;background:rgba(52,211,153,.05);border:1px solid rgba(52,211,153,.15);border-radius:10px;color:var(--text);font-size:.87rem;outline:none;font-family:inherit';
-  if(initialValue && initialValue.startsWith('https://')) urlInp.value = initialValue;
-  urlInp.addEventListener('input', ()=>{ hidden.value=urlInp.value; livePrev(); });
-  urlInp.addEventListener('blur',  ()=>{
-    let v=urlInp.value.trim();
-    if(v && !v.startsWith('https://') && !v.startsWith('data:')) v='https://'+v;
-    urlInp.value=v; hidden.value=v; livePrev();
-  });
-  panelUrl.appendChild(urlInp);
-
-  // ファイルアップロードパネル
-  const panelUpload = document.createElement('div'); panelUpload.style.display='none';
-  const fileInput = document.createElement('input');
-  fileInput.type='file'; fileInput.accept='image/*'; fileInput.style.display='none';
-  const uploadArea = document.createElement('div'); uploadArea.className='icon-upload-area';
-  uploadArea.innerHTML='<div style="font-size:1.5rem">📁</div><div style="font-size:.75rem;color:rgba(52,211,153,.6);margin-top:4px">タップして画像を選択</div>';
-
-  // 画像サムネイル（選択後に表示）
-  const thumbUp = document.createElement('img'); thumbUp.className='icon-thumb-preview'; thumbUp.style.display='none';
-  if(initialValue && initialValue.startsWith('data:image/')) { thumbUp.src=initialValue; thumbUp.style.display='block'; }
-
-  uploadArea.addEventListener('click', ()=>fileInput.click());
-  uploadArea.addEventListener('dragover', e=>{ e.preventDefault(); uploadArea.classList.add('dragover'); });
-  uploadArea.addEventListener('dragleave', ()=>uploadArea.classList.remove('dragover'));
-  uploadArea.addEventListener('drop', e=>{
-    e.preventDefault(); uploadArea.classList.remove('dragover');
-    const file = e.dataTransfer.files[0];
-    if(file && file.type.startsWith('image/')) processFile(file);
-  });
-  fileInput.addEventListener('change', ()=>{
-    if(fileInput.files[0]) processFile(fileInput.files[0]);
-  });
-
-  function processFile(file){
-    // 画像でないファイルをスキップ
-    if(!file.type.startsWith('image/')){
-      toast('画像ファイルを選択してください','err'); return;
-    }
-    // ローディング表示
-    uploadArea.querySelector('div:first-child').textContent='⏳';
-    uploadArea.style.pointerEvents = 'none';
-
-    resizeImageToBase64(file, b64=>{
-      hidden.value = b64;
-      livePrev();
-      thumbUp.src  = b64;
-      thumbUp.style.display = 'block';
-      uploadArea.querySelector('div:first-child').textContent = '✅';
-      uploadArea.style.pointerEvents = '';
-      toast('✅ 画像を読み込みました','ok');
-    });
-
-    // 3秒後にローディングが終わらない場合はリセット
-    setTimeout(()=>{
-      if(uploadArea.querySelector('div:first-child').textContent === '⏳'){
-        uploadArea.querySelector('div:first-child').textContent = '📁';
-        uploadArea.style.pointerEvents = '';
-      }
-    }, 3000);
-  }
-
-  panelUpload.append(fileInput, uploadArea, thumbUp);
-
-  // 貼り付けパネル
-  const panelPaste = document.createElement('div'); panelPaste.style.display='none';
-  const pasteBtn = document.createElement('button');
-  pasteBtn.type='button';
-  pasteBtn.style.cssText='width:100%;padding:14px;border-radius:12px;border:2px dashed rgba(52,211,153,.3);background:rgba(52,211,153,.04);color:rgba(52,211,153,.7);font-size:.85rem;cursor:pointer;font-family:inherit;transition:all .2s';
-  pasteBtn.textContent='📋 ここをタップしてクリップボードから貼り付け';
-  const thumbPaste = document.createElement('img'); thumbPaste.className='icon-thumb-preview'; thumbPaste.style.display='none';
-  if(initialValue && initialValue.startsWith('data:image/')) { thumbPaste.src=initialValue; thumbPaste.style.display='block'; }
-
-  pasteBtn.addEventListener('click', async ()=>{
+// 画像をCanvas経由で65×65px base64に縮小変換
+// ※ createObjectURL を使用（readAsDataURL より大幅に省メモリ）
+function resizeImageToBase64(file,callback){
+  if(file.size>100*1024*1024){toast('画像ファイルが大きすぎます（100MB以下を選択してください）','err');return;}
+  const objectUrl=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
     try{
-      const items = await navigator.clipboard.read();
-      let found = false;
-      for(const item of items){
-        const imageType = item.types.find(t=>t.startsWith('image/'));
-        if(imageType){
-          const blob = await item.getType(imageType);
-          const file = new File([blob], 'paste.png', {type:imageType});
-          resizeImageToBase64(file, b64=>{
-            hidden.value=b64; livePrev();
-            thumbPaste.src=b64; thumbPaste.style.display='block';
-            pasteBtn.textContent='✅ 貼り付け完了';
-            toast('✅ 画像を貼り付けました','ok');
+      const canvas=document.createElement('canvas');
+      const SIZE=65;canvas.width=SIZE;canvas.height=SIZE;
+      const ctx=canvas.getContext('2d');
+      const s=Math.min(img.width,img.height);
+      const ox=(img.width-s)/2;const oy=(img.height-s)/2;
+      ctx.drawImage(img,ox,oy,s,s,0,0,SIZE,SIZE);
+      callback(canvas.toDataURL('image/jpeg',0.80));
+    }catch(e){toast('画像の変換に失敗しました','err');}
+    finally{URL.revokeObjectURL(objectUrl);img.src='';}
+  };
+  img.onerror=()=>{URL.revokeObjectURL(objectUrl);toast('画像を読み込めませんでした','err');};
+  img.src=objectUrl;
+}
+
+function buildIconField(initialValue=''){
+  const fg=document.createElement('div');fg.className='fg';
+  const lbl=document.createElement('label');lbl.textContent='アイコン';
+  fg.appendChild(lbl);
+  const hidden=document.createElement('input');
+  hidden.type='hidden';hidden.id='fi';hidden.value=initialValue;
+  fg.appendChild(hidden);
+  let openId='emoji';
+  if(initialValue.startsWith('https://')||initialValue.startsWith('http://'))openId='url';
+  else if(initialValue.startsWith('data:image/'))openId='file';
+  const acc=document.createElement('div');acc.className='icon-acc';
+  const ITEMS=[
+    {id:'emoji',em:'😀',label:'絵文字'},
+    {id:'url',em:'🔗',label:'URL直接入力'},
+    {id:'file',em:'📁',label:'画像ファイル'},
+    {id:'paste',em:'📋',label:'クリップボード貼り付け'},
+    {id:'site',em:'🌐',label:'サイトアイコン自動取得'},
+  ];
+  ITEMS.forEach(({id,em,label})=>{
+    const row=document.createElement('div');
+    row.className='icon-acc-row'+(id===openId?' open':'');
+    const hdr=document.createElement('div');hdr.className='icon-acc-hdr';
+    const ico=document.createElement('span');ico.className='icon-acc-em';ico.textContent=em;
+    const ttl=document.createElement('span');ttl.className='icon-acc-ttl';ttl.textContent=label;
+    const arr=document.createElement('span');arr.className='icon-acc-arr';arr.textContent='▶';
+    hdr.append(ico,ttl,arr);
+    const body=document.createElement('div');body.className='icon-acc-body';
+    body.style.display=id===openId?'block':'none';
+    if(id==='emoji'){
+      const inp=document.createElement('input');
+      inp.type='text';inp.placeholder='🌿 絵文字を入力';
+      inp.className='icon-acc-input';inp.style.fontSize='1.4rem';
+      if(initialValue&&!initialValue.startsWith('http')&&!initialValue.startsWith('data:'))inp.value=initialValue;
+      inp.addEventListener('input',()=>{hidden.value=inp.value.slice(0,2);livePrev();});
+      body.appendChild(inp);
+    }else if(id==='url'){
+      const inp=document.createElement('input');
+      inp.type='url';inp.placeholder='https://example.com/icon.png';
+      inp.className='icon-acc-input';
+      if(initialValue&&initialValue.startsWith('https://'))inp.value=initialValue;
+      inp.addEventListener('input',()=>{hidden.value=inp.value;livePrev();});
+      inp.addEventListener('blur',()=>{
+        let v=inp.value.trim();
+        if(v&&!v.startsWith('https://')&&!v.startsWith('data:'))v='https://'+v;
+        inp.value=v;hidden.value=v;livePrev();
+      });
+      body.appendChild(inp);
+    }else if(id==='file'){
+      const fi=document.createElement('input');fi.type='file';fi.accept='image/*';fi.style.display='none';
+      const area=document.createElement('div');area.className='icon-acc-drop';
+      const aIco=document.createElement('span');aIco.style.fontSize='1.4rem';aIco.textContent='📁';
+      const aTxt=document.createElement('span');aTxt.className='icon-acc-drop-txt';aTxt.textContent='タップして画像を選択';
+      area.append(aIco,aTxt);
+      const thumb=document.createElement('img');thumb.className='icon-acc-thumb';thumb.style.display='none';
+      if(initialValue&&initialValue.startsWith('data:image/')){thumb.src=initialValue;thumb.style.display='block';}
+      area.addEventListener('click',()=>fi.click());
+      fi.addEventListener('change',()=>{if(fi.files[0])_processIconFile(fi.files[0],hidden,area,thumb);});
+      area.addEventListener('dragover',e=>{e.preventDefault();area.classList.add('dragover');});
+      area.addEventListener('dragleave',()=>area.classList.remove('dragover'));
+      area.addEventListener('drop',e=>{
+        e.preventDefault();area.classList.remove('dragover');
+        const f=e.dataTransfer.files[0];
+        if(f&&f.type.startsWith('image/'))_processIconFile(f,hidden,area,thumb);
+      });
+      body.append(fi,area,thumb);
+    }else if(id==='paste'){
+      const btn=document.createElement('button');btn.type='button';btn.className='icon-acc-paste-btn';
+      btn.textContent='📋 ここをタップしてクリップボードから貼り付け';
+      const thumb=document.createElement('img');thumb.className='icon-acc-thumb';thumb.style.display='none';
+      if(initialValue&&initialValue.startsWith('data:image/')){thumb.src=initialValue;thumb.style.display='block';}
+      btn.addEventListener('click',async()=>{
+        try{
+          const items=await navigator.clipboard.read();let found=false;
+          for(const item of items){
+            const t=item.types.find(t=>t.startsWith('image/'));
+            if(t){
+              const blob=await item.getType(t);
+              const file=new File([blob],'paste.png',{type:t});
+              resizeImageToBase64(file,b64=>{
+                hidden.value=b64;livePrev();thumb.src=b64;thumb.style.display='block';
+                btn.textContent='✅ 貼り付け完了';toast('✅ 画像を貼り付けました','ok');
+              });
+              found=true;break;
+            }
+          }
+          if(!found)toast('クリップボードに画像がありません','err');
+        }catch(e){toast('貼り付けの許可が必要です','err');}
+      });
+      body.append(btn,thumb);
+    }else if(id==='site'){
+      const desc=document.createElement('p');
+      desc.style.cssText='font-size:.72rem;color:rgba(52,211,153,.6);margin:0 0 10px;line-height:1.6';
+      desc.textContent='アプリのURLを入力すると、ホーム画面アイコンを自動取得します。';
+      const urlRow=document.createElement('div');urlRow.style.cssText='display:flex;gap:8px;align-items:center';
+      const urlInp=document.createElement('input');urlInp.type='url';urlInp.placeholder='https://example.com';
+      urlInp.className='icon-acc-input';urlInp.style.flex='1';
+      const fetchBtn=document.createElement('button');fetchBtn.type='button';fetchBtn.className='icon-acc-fetch-btn';fetchBtn.textContent='取得';
+      urlRow.append(urlInp,fetchBtn);
+      const previewArea=document.createElement('div');previewArea.className='icon-acc-site-preview';previewArea.style.display='none';
+      fetchBtn.addEventListener('click',()=>{
+        let inputUrl=urlInp.value.trim();
+        if(!inputUrl){toast('URLを入力してください','err');return;}
+        if(!inputUrl.startsWith('http'))inputUrl='https://'+inputUrl;
+        let domain;
+        try{domain=new URL(inputUrl).hostname;}catch(e){toast('URLが正しくありません','err');return;}
+        fetchBtn.textContent='取得中...';fetchBtn.disabled=true;
+        previewArea.style.display='none';previewArea.innerHTML='';
+        const candidates=[
+          {url:`https://${domain}/apple-touch-icon.png`,label:'apple-touch-icon'},
+          {url:`https://${domain}/apple-touch-icon-precomposed.png`,label:'precomposed'},
+          {url:`https://${domain}/apple-touch-icon-180x180.png`,label:'180×180'},
+          {url:`https://www.google.com/s2/favicons?domain=${domain}&sz=128`,label:'Favicon 128px'},
+          {url:`https://www.google.com/s2/favicons?domain=${domain}&sz=64`,label:'Favicon 64px'},
+        ];
+        previewArea.style.display='block';
+        const pttl=document.createElement('p');pttl.style.cssText='font-size:.72rem;color:rgba(52,211,153,.5);margin:0 0 8px';pttl.textContent='候補アイコン（タップして選択）：';
+        const grid=document.createElement('div');grid.style.cssText='display:flex;flex-wrap:wrap;gap:10px';
+        previewArea.append(pttl,grid);
+        let loaded=0;
+        candidates.forEach(({url:iconUrl,label:iconLabel})=>{
+          const wrap=document.createElement('div');wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer';
+          const img=document.createElement('img');img.src=iconUrl;
+          img.style.cssText='width:56px;height:56px;border-radius:12px;object-fit:cover;border:2px solid rgba(52,211,153,.15);transition:border-color .2s,box-shadow .2s;background:#111';img.alt='';
+          img.onload=()=>{loaded++;if(loaded===1){fetchBtn.textContent='取得';fetchBtn.disabled=false;}};
+          img.onerror=()=>{wrap.style.display='none';};
+          const ilbl=document.createElement('span');ilbl.style.cssText='font-size:.58rem;color:rgba(255,255,255,.35);max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center';ilbl.textContent=iconLabel;
+          wrap.addEventListener('click',()=>{
+            hidden.value=iconUrl;livePrev();
+            grid.querySelectorAll('img').forEach(i=>{i.style.borderColor='rgba(52,211,153,.15)';i.style.boxShadow='none';});
+            img.style.borderColor='var(--accent)';img.style.boxShadow='0 0 0 2px rgba(52,211,153,.35)';
+            toast('✅ アイコンを選択しました','ok');
           });
-          found = true; break;
+          wrap.append(img,ilbl);grid.appendChild(wrap);
+        });
+        setTimeout(()=>{
+          fetchBtn.textContent='再取得';fetchBtn.disabled=false;
+          if(loaded===0)previewArea.innerHTML='<p style="font-size:.75rem;color:rgba(248,113,113,.7);margin:0">アイコンが見つかりませんでした</p>';
+        },4500);
+      });
+      body.append(desc,urlRow,previewArea);
+    }
+    hdr.addEventListener('click',()=>{
+      const isOpen=row.classList.contains('open');
+      acc.querySelectorAll('.icon-acc-row').forEach(r=>r.classList.remove('open'));
+      acc.querySelectorAll('.icon-acc-body').forEach(b=>b.style.display='none');
+      if(!isOpen){
+        row.classList.add('open');body.style.display='block';
+        if(id==='site'){
+          const mainUrl=document.getElementById('fu');const siteInp=body.querySelector('input[type="url"]');
+          if(mainUrl&&mainUrl.value&&siteInp&&!siteInp.value)siteInp.value=mainUrl.value;
         }
       }
-      if(!found) toast('クリップボードに画像がありません','err');
-    }catch(e){
-      toast('貼り付けの許可が必要です（ブラウザの確認ダイアログを許可してください）','err');
-    }
+    });
+    row.append(hdr,body);acc.appendChild(row);
   });
-  panelPaste.append(pasteBtn, thumbPaste);
-
-  // ── タブ切替 ──
-  const panels = [panelEmoji, panelUrl, panelUpload, panelPaste];
-  const tabBtns = [tabEmoji, tabUrl, tabUpload, tabPaste];
-
-  // 初期タブ自動判定
-  let initTab = 0;
-  if(initialValue.startsWith('https://')) initTab=1;
-  else if(initialValue.startsWith('data:image/')) initTab=2;
-
-  function switchTab(idx){
-    tabBtns.forEach((t,i)=>t.classList.toggle('active', i===idx));
-    panels.forEach((p,i)=>p.style.display= i===idx?'block':'none');
-  }
-  tabBtns.forEach((t,i)=>t.addEventListener('click',()=>switchTab(i)));
-  switchTab(initTab);
-
-  panels.forEach(p=>fg.appendChild(p));
+  fg.appendChild(acc);
   return fg;
 }
 
