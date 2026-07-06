@@ -638,20 +638,6 @@ function validateEntry(e){
 // ═══════════════════════════════════════════════════════
 //  定数・デモデータ
 // ═══════════════════════════════════════════════════════
-const DEMO=[
-  {id:'d1',name:'Google',  url:'https://google.com',          icon:'🔍',color:'rgba(234,67,53,0.5)'},
-  {id:'d2',name:'YouTube', url:'https://youtube.com',         icon:'▶️', color:'rgba(200,0,0,0.48)'},
-  {id:'d3',name:'Drive',   url:'https://drive.google.com',    icon:'📂',color:'rgba(16,185,129,0.45)'},
-  {id:'d4',name:'Gmail',   url:'https://gmail.com',           icon:'✉️', color:'rgba(234,67,53,0.48)'},
-  {id:'d5',name:'Calendar',url:'https://calendar.google.com', icon:'📅',color:'rgba(14,165,233,0.48)'},
-  {id:'d6',name:'Slack',   url:'https://slack.com',           icon:'💬',color:'rgba(168,85,247,0.48)'},
-  {id:'d7',name:'Notion',  url:'https://notion.so',           icon:'📓',color:'rgba(255,255,255,0.08)'},
-  {id:'d8',name:'GitHub',  url:'https://github.com',          icon:'🐙',color:'rgba(20,30,60,0.65)'},
-  {id:'d9',name:'Figma',   url:'https://figma.com',           icon:'🎨',color:'rgba(236,72,153,0.48)'},
-  {id:'d10',name:'ChatGPT',url:'https://chatgpt.com',         icon:'🤖',color:'rgba(16,185,129,0.48)'},
-  {id:'d11',name:'Sheets', url:'https://sheets.google.com',   icon:'📊',color:'rgba(16,185,129,0.52)'},
-  {id:'d12',name:'Meet',   url:'https://meet.google.com',     icon:'🎥',color:'rgba(14,165,233,0.52)'},
-];
 const WALLS=[
   'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=80',
   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80',
@@ -675,6 +661,7 @@ const COLORS=[
 //  State
 // ═══════════════════════════════════════════════════════
 let slots    = new Array(TOTAL_SLOTS).fill(null);
+let isFreshInstall = false; // localStorageに何も無い状態からデモを表示した直後かどうか
 let isAdmin  = false;
 let selCol   = COLORS[0].h;
 let selSlot  = -1;
@@ -803,6 +790,10 @@ async function autoSyncOnStartup(){
     // ── スマートマージ：ローカルデータを保護 ──
     // GASにあるスロット → GASを優先（マルチデバイス同期）
     // GASにない＆ローカルにある → ローカルを保護（クラッシュ前の変更を保持）
+    // ただし「初回起動でデモアイコンを表示しただけ」の状態は保護対象外
+    // （保護してしまうとデモと実データが混在表示されてしまうため）
+    const skipLocalProtection = isFreshInstall;
+    isFreshInstall = false;
     const newSlots = new Array(TOTAL_SLOTS).fill(null);
     for(let i=0; i<TOTAL_SLOTS; i++){
       if(slots[i] && slots[i].isAdmin) continue; // 管理者は後で処理
@@ -814,7 +805,7 @@ async function autoSyncOnStartup(){
           newSlots[i] = gasSlots[i];
         }
       }
-      else if(slots[i])     newSlots[i] = slots[i];     // ローカルを保護
+      else if(slots[i] && !skipLocalProtection) newSlots[i] = slots[i];     // ローカルを保護
     }
 
     // 管理者アイコン廃止（配置不要）
@@ -903,6 +894,7 @@ function setWall(url){
 // ═══════════════════════════════════════════════════════
 function loadSlots(){
   const saved = SS.getObj('ml_slots', null);
+  isFreshInstall = !(saved && Array.isArray(saved));
   if(saved && Array.isArray(saved)){
     slots = new Array(TOTAL_SLOTS).fill(null);
 
@@ -931,8 +923,9 @@ function loadSlots(){
   render();
 }
 function initDefault(){
+  // サンプル（デモ）アイコンは廃止。空の状態で開始し、GAS同期または
+  // 管理者の手動追加でアイコンを埋めていく運用に統一。
   slots = new Array(TOTAL_SLOTS).fill(null);
-  DEMO.forEach((l,i)=>{ slots[i]=l; });
   saveSlots();
 }
 function ensureAdminIcon(){
