@@ -787,15 +787,17 @@ async function autoSyncOnStartup(){
 
     // GASデータをslot番号で配置
     const gasSlots = new Array(TOTAL_SLOTS).fill(null);
-    const overflow = []; // TOTAL_SLOTS以上のスロット番号のデータ
+    const overflow = []; // 範囲外のスロット番号 or 他エントリとスロット番号が衝突したデータ
     validEntries.forEach((lnk)=>{
       if(lnk.isAdmin) return;
       const sn = parseInt(lnk.slot);
       if(isNaN(sn)) return;
-      if(sn >= 0 && sn < TOTAL_SLOTS){
-        if(!gasSlots[sn]) gasSlots[sn] = lnk;
+      if(sn >= 0 && sn < TOTAL_SLOTS && !gasSlots[sn]){
+        gasSlots[sn] = lnk;
       } else {
-        overflow.push(lnk); // 範囲外（旧32スロット分）は別処理
+        // 範囲外、またはスロット番号が衝突（同じ番号を複数端末が使ってしまった等）
+        // → データを消さず、あふれ扱いにして後で空きスロットへ割り当てる
+        overflow.push(lnk);
       }
     });
     // あふれたデータを空きスロットに移動
@@ -972,11 +974,20 @@ async function syncFromGAS(){
     if(json.status==='ok' && Array.isArray(json.data)){
       const adminSlot = slots.findIndex(s=>s&&s.isAdmin);
       slots = new Array(TOTAL_SLOTS).fill(null);
-      // slot番号を使って正確な位置に配置
+      // slot番号を使って正確な位置に配置（番号が衝突した場合はデータを消さず、あふれ扱いにする）
+      const overflow = [];
       json.data.forEach((lnk)=>{
         if(!validateEntry(lnk)) return;
         const sn = parseInt(lnk.slot);
-        if(!isNaN(sn) && sn >= 0 && sn < TOTAL_SLOTS) slots[sn] = lnk;
+        if(!isNaN(sn) && sn >= 0 && sn < TOTAL_SLOTS && !slots[sn]){
+          slots[sn] = lnk;
+        } else if(!isNaN(sn)) {
+          overflow.push(lnk); // 範囲外 or スロット番号衝突 → 後で空きスロットへ
+        }
+      });
+      overflow.forEach(lnk=>{
+        const emptyIdx = slots.findIndex(s => !s);
+        if(emptyIdx >= 0) slots[emptyIdx] = {...lnk, slot: emptyIdx};
       });
       const ai = adminSlot>=0 ? adminSlot : 23;
       if(!slots[ai]) slots[ai]={...ADMIN_ENTRY};
