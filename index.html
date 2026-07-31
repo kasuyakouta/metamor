@@ -33,7 +33,7 @@
   --dock-bg:rgba(5,14,10,0.75);
   --panel-bg:rgba(4,12,8,0.96);
 }
-html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;background:#000}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none;font-family:'Helvetica Neue',Arial,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased;background:#000}
 
 /* ── BG ── */
 #bg{position:fixed;inset:0;z-index:0;background:#000;
@@ -132,7 +132,7 @@ html,body{height:100%;overflow:hidden;font-family:'Helvetica Neue',Arial,sans-se
 #btn-done:active{transform:scale(.95);background:rgba(52,211,153,.4)}
 
 /* ── GRID ── */
-#grid-wrap{flex:1;overflow-y:auto;padding:8px 16px env(safe-area-inset-bottom,20px);-webkit-overflow-scrolling:touch;background:#000}
+#grid-wrap{flex:1;overflow-y:auto;overscroll-behavior:none;padding:8px 16px env(safe-area-inset-bottom,20px);-webkit-overflow-scrolling:touch;background:#000}
 #icon-grid.admin-active{padding-bottom:80px}
 #grid-wrap::-webkit-scrollbar{width:3px}
 #grid-wrap::-webkit-scrollbar-thumb{background:rgba(52,211,153,.15);border-radius:3px}
@@ -1131,7 +1131,12 @@ function fitGridToViewport(){
   const actualTotal = ROWS*(iconSize+cardGap+labelSize*1.2) + (ROWS-1)*rowGap;
   wrap.style.overflowY = (actualTotal > usableHeight + 1) ? 'auto' : 'hidden';
 }
-window.addEventListener('resize', fitGridToViewport);
+let _fitDebounceTimer = null;
+function _fitGridDebounced(){
+  if(_fitDebounceTimer) clearTimeout(_fitDebounceTimer);
+  _fitDebounceTimer = setTimeout(fitGridToViewport, 120);
+}
+window.addEventListener('resize', _fitGridDebounced);
 window.addEventListener('orientationchange', ()=>setTimeout(fitGridToViewport, 200));
 
 function render(){
