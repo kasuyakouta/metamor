@@ -987,24 +987,31 @@ async function syncFromGAS(){
     const json = await res.json();
     if(json.status==='ok' && Array.isArray(json.data)){
       const adminSlot = slots.findIndex(s=>s&&s.isAdmin);
-      slots = new Array(TOTAL_SLOTS).fill(null);
+      const newSlots = new Array(TOTAL_SLOTS).fill(null);
       // slot番号を使って正確な位置に配置（番号が衝突した場合はデータを消さず、あふれ扱いにする）
       const overflow = [];
+      let placedCount = 0;
       json.data.forEach((lnk)=>{
         if(!validateEntry(lnk)) return;
         const sn = parseInt(lnk.slot);
-        if(!isNaN(sn) && sn >= 0 && sn < TOTAL_SLOTS && !slots[sn]){
-          slots[sn] = lnk;
+        if(!isNaN(sn) && sn >= 0 && sn < TOTAL_SLOTS && !newSlots[sn]){
+          newSlots[sn] = lnk; placedCount++;
         } else if(!isNaN(sn)) {
           overflow.push(lnk); // 範囲外 or スロット番号衝突 → 後で空きスロットへ
         }
       });
+      // 受信データはあるのに1件も配置できなかった場合、バックエンド側の不具合等で
+      // 実質「全滅」している可能性が高い。安全側に倒してローカルを上書きしない
+      if(json.data.length > 0 && placedCount === 0 && overflow.length === 0){
+        throw new Error('GASから受信したデータをスロットに配置できませんでした');
+      }
       overflow.forEach(lnk=>{
-        const emptyIdx = slots.findIndex(s => !s);
-        if(emptyIdx >= 0) slots[emptyIdx] = {...lnk, slot: emptyIdx};
+        const emptyIdx = newSlots.findIndex(s => !s);
+        if(emptyIdx >= 0){ newSlots[emptyIdx] = {...lnk, slot: emptyIdx}; placedCount++; }
       });
       const ai = adminSlot>=0 ? adminSlot : 23;
-      if(!slots[ai]) slots[ai]={...ADMIN_ENTRY};
+      if(!newSlots[ai]) newSlots[ai]={...ADMIN_ENTRY};
+      slots = newSlots;
       saveSlots(); render();
       toast('✅ GASから同期しました','ok');
     } else { throw new Error('invalid response'); }

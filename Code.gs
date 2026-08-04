@@ -98,6 +98,7 @@ function doGet(e) {
         url:   String(row[COL.URL]  || ''),
         icon:  String(row[COL.ICON] || ''),
         color: String(row[COL.COLOR] || 'rgba(99,102,241,0.6)'),
+        slot:  slotNum, // フロントのslot配置ロジックが参照するため必須
       };
 
       // ⑤ 各エントリを検証してから返す
