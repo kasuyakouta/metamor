@@ -21,7 +21,7 @@ const SHEET_NAME = 'リンク';
  * フロント側の「設定 → リクエストトークン」と同じ値を設定する。
  * 空文字の場合はトークン検証をスキップ（開発時のみ推奨）。
  */
-const REQUEST_TOKEN = 'metamor2026';
+const REQUEST_TOKEN = '3cyM84qxYXfmuUZdDYpkQMvUNYAijbJL';
 
 /** スロット最大数（フロントの TOTAL_SLOTS と合わせる）*/
 const TOTAL_SLOTS = 28;

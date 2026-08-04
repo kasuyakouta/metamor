@@ -554,7 +554,7 @@ async function hashPin(pin){
 let ADMIN_PIN_HASH = '';
 // デフォルトGAS URL（初回起動時にlocalStorageが空でも自動適用）
 const DEFAULT_GAS_URL   = 'https://script.google.com/macros/s/AKfycbzU3lABLwfcCY3lLMaNDbCp0h9IaWIoRsV9XuO17d7AFLXogYTq0MdGBcII7gjnbMly/exec';
-const DEFAULT_GAS_TOKEN = 'metamor2026';
+const DEFAULT_GAS_TOKEN = '3cyM84qxYXfmuUZdDYpkQMvUNYAijbJL';
 
 // localStorageに未保存の場合はデフォルト値を適用
 if(!SS.get('ml_gas',''))  SS.set('ml_gas',   DEFAULT_GAS_URL);
@@ -879,8 +879,10 @@ function applyUrlParams(){
     if(updated){
       const cleanUrl = location.pathname;
       history.replaceState({}, '', cleanUrl);
-      // GAS同期を自動実行（少し待ってからUIが描画された後に）
-      setTimeout(()=>syncFromGAS(), 800);
+      // GAS同期はこの関数の直後にIIFE側で呼ばれるautoSyncOnStartup()が
+      // 更新済みのGAS_URL/tokenを使って自動実行するため、ここで二重に
+      // syncFromGAS()を呼ぶ必要はない（呼ぶと同一エンドポイントへの
+      // 冗長なリクエストとトースト表示の重複が発生していた）
     }
   }catch(e){}
 }
@@ -2173,6 +2175,12 @@ function hideQrCode(){
 // ═══════════════════════════════════════════════════════
 let scanStream = null;
 let scanAnimFrame = null;
+
+// タブがバックグラウンドになったらスキャン中のカメラを解放する
+// （放置するとバッテリー消費・プライバシー上望ましくないため）
+document.addEventListener('visibilitychange', ()=>{
+  if(document.visibilityState === 'hidden' && scanStream) stopQrScan();
+});
 
 function startQrScan(){
   // モーダルを動的生成
