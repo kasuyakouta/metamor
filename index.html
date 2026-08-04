@@ -828,12 +828,16 @@ async function autoSyncOnStartup(){
 
     // 管理者アイコン廃止（配置不要）
 
+    // fetch開始後に管理者モードへ入っていた場合、編集中のデータを
+    // バックグラウンド同期の結果で上書きしない
+    if(isAdmin) return;
+
     const changed = JSON.stringify(newSlots) !== JSON.stringify(slots);
     if(changed){
       slots = newSlots;
       saveSlots();
       render();
-      if(!isAdmin) toast('🔄 最新データに更新しました','ok');
+      toast('🔄 最新データに更新しました','ok');
     }
   }catch(e){
     _scheduleSyncRetry(); // 通信エラー時：手動更新に頼らず自動で再試行
@@ -1208,6 +1212,7 @@ function buildCard(entry, slotIdx){
   card.addEventListener('touchstart', e=>onTouchStart(e,slotIdx,isAdminIcon),{passive:false});
   card.addEventListener('touchmove',  e=>onCardTouchMove(e),{passive:false});
   card.addEventListener('touchend',   e=>onCardTouchEnd(e,slotIdx,isAdminIcon),{passive:false});
+  card.addEventListener('touchcancel', onCardTouchCancel,{passive:false});
   // PC（マウス）対応
   card.addEventListener('mousedown',  e=>onMouseDown(e,slotIdx,isAdminIcon));
   card.addEventListener('click',      e=>onCardClick(e,slotIdx,isAdminIcon));
@@ -1257,6 +1262,11 @@ function onCardTouchEnd(e,slotIdx,isAdminIcon){
   }
   if(isAdminIcon){exitAdmin();return;}
   openPanel('edit',slotIdx);
+}
+// 長押し待機中にOSジェスチャー等でtouchcancelが発生した場合、
+// 指が離れた後にbeginDragが古い座標で誤発火しないようタイマーを解除する
+function onCardTouchCancel(){
+  if(longPressTimer){clearTimeout(longPressTimer);longPressTimer=null;}
 }
 
 // ── PC（マウス）用イベントハンドラ ─────────────────────────
