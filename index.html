@@ -559,6 +559,15 @@ const DEFAULT_GAS_TOKEN = '3cyM84qxYXfmuUZdDYpkQMvUNYAijbJL';
 // localStorageに未保存の場合はデフォルト値を適用
 if(!SS.get('ml_gas',''))  SS.set('ml_gas',   DEFAULT_GAS_URL);
 if(!SS.get('ml_gas_token','')) SS.set('ml_gas_token', DEFAULT_GAS_TOKEN);
+
+// トークンローテーション移行：端末に保存済みのトークンが過去に配布した
+// デフォルト値のままであれば、利用者が個別に再設定しなくても済むよう
+// 新しいデフォルト値へ自動的に書き換える（ml_pin_hash移行と同じ考え方）
+const LEGACY_DEFAULT_GAS_TOKENS = ['metamor2026'];
+if(LEGACY_DEFAULT_GAS_TOKENS.includes(SS.get('ml_gas_token', ''))){
+  SS.set('ml_gas_token', DEFAULT_GAS_TOKEN);
+}
+
 let GAS_URL = SS.get('ml_gas', DEFAULT_GAS_URL);
 const TOTAL_SLOTS  = 28;
 const ADMIN_ENTRY  = {id:'__admin__',name:'管理者',url:'',icon:'⚙️',color:'rgba(10,30,20,0.75)',isAdmin:true};
