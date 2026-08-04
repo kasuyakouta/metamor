@@ -2329,6 +2329,8 @@ function _processScannedUrl(rawUrl){
   }, 800);
 }
 
+// ④ XSS対策：title/detailはQRコードから読み取った未検証データを含みうるため
+// innerHTMLではなくDOM API＋textContentで組み立てる
 function _showScanError(title, detail){
   // モーダルを使ってエラーを目立つ形で表示
   let errModal = document.getElementById('scan-err-modal');
@@ -2342,21 +2344,30 @@ function _showScanError(title, detail){
     `;
     document.body.appendChild(errModal);
   }
-  errModal.innerHTML = `
-    <div style="background:#0a0f0c;border:1px solid rgba(248,113,113,.4);border-radius:20px;
-                padding:28px 24px;max-width:320px;width:100%;text-align:center">
-      <div style="font-size:2rem;margin-bottom:12px">⚠️</div>
-      <div style="font-size:.95rem;font-weight:700;color:#f87171;margin-bottom:8px">${title}</div>
-      <div style="font-size:.75rem;color:rgba(255,255,255,.5);line-height:1.6;
-                  white-space:pre-wrap;margin-bottom:20px">${detail}</div>
-      <button onclick="document.getElementById('scan-err-modal').style.display='none'"
-        style="padding:10px 28px;border-radius:50px;border:1px solid rgba(52,211,153,.35);
-               background:rgba(52,211,153,.15);color:#34d399;font-size:.88rem;
-               font-weight:600;cursor:pointer;font-family:inherit">
-        閉じる
-      </button>
-    </div>
-  `;
+  errModal.innerHTML = ''; // 前回表示分をクリア
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#0a0f0c;border:1px solid rgba(248,113,113,.4);border-radius:20px;padding:28px 24px;max-width:320px;width:100%;text-align:center';
+
+  const iconEl = document.createElement('div');
+  iconEl.style.cssText = 'font-size:2rem;margin-bottom:12px';
+  iconEl.textContent = '⚠️';
+
+  const titleEl = document.createElement('div');
+  titleEl.style.cssText = 'font-size:.95rem;font-weight:700;color:#f87171;margin-bottom:8px';
+  titleEl.textContent = title;
+
+  const detailEl = document.createElement('div');
+  detailEl.style.cssText = 'font-size:.75rem;color:rgba(255,255,255,.5);line-height:1.6;white-space:pre-wrap;margin-bottom:20px';
+  detailEl.textContent = detail;
+
+  const btn = document.createElement('button');
+  btn.style.cssText = 'padding:10px 28px;border-radius:50px;border:1px solid rgba(52,211,153,.35);background:rgba(52,211,153,.15);color:#34d399;font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit';
+  btn.textContent = '閉じる';
+  btn.addEventListener('click', ()=>{ errModal.style.display = 'none'; });
+
+  card.appendChild(iconEl); card.appendChild(titleEl); card.appendChild(detailEl); card.appendChild(btn);
+  errModal.appendChild(card);
   errModal.style.display = 'flex';
 }
 

@@ -24,7 +24,7 @@ const SHEET_NAME = 'リンク';
 const REQUEST_TOKEN = 'metamor2026';
 
 /** スロット最大数（フロントの TOTAL_SLOTS と合わせる）*/
-const TOTAL_SLOTS = 24;
+const TOTAL_SLOTS = 28;
 
 // ──────────────────────────────────────────────────────────────
 //  列定義（スプレッドシートの列順）
@@ -167,12 +167,16 @@ function handleAdd(body) {
   const slot  = (body.slot !== undefined) ? parseInt(body.slot) : findNextSlot(sheet);
   const color = sanitizeColor(body.color);
 
+  // スロット番号の範囲チェック（不正値をそのまま書き込むとdoGetで返らなくなり
+  // データが消えたように見えてしまうため、appendRow前に必ず弾く）
+  if (isNaN(slot) || slot < 0 || slot >= TOTAL_SLOTS) {
+    return buildError(`スロット番号が不正です（0〜${TOTAL_SLOTS - 1}の範囲で指定してください）`, 400);
+  }
+
   // 既存スロットの上書き防止（同スロットが埋まっていれば拒否）
-  if (slot >= 0 && slot < TOTAL_SLOTS) {
-    const existing = findRowBySlot(sheet, slot);
-    if (existing > 0) {
-      return buildError(`スロット${slot}はすでに使用中です`, 409);
-    }
+  const existing = findRowBySlot(sheet, slot);
+  if (existing > 0) {
+    return buildError(`スロット${slot}はすでに使用中です`, 409);
   }
 
   sheet.appendRow([
@@ -211,6 +215,16 @@ function handleUpdate(body) {
     return buildError('URLはhttps://またはhttp://で始まる必要があります', 400);
   }
 
+  // スロット番号の範囲チェック（不正値を書き込むとdoGetで返らなくなりデータが
+  // 消えたように見えてしまうため、更新前に必ず弾く）
+  let newSlot;
+  if (body.slot !== undefined) {
+    newSlot = parseInt(body.slot);
+    if (isNaN(newSlot) || newSlot < 0 || newSlot >= TOTAL_SLOTS) {
+      return buildError(`スロット番号が不正です（0〜${TOTAL_SLOTS - 1}の範囲で指定してください）`, 400);
+    }
+  }
+
   const sheet  = getSheet();
   const rowNum = findRowById(sheet, String(body.id));
 
@@ -222,7 +236,7 @@ function handleUpdate(body) {
   if (body.url   !== undefined) sheet.getRange(rowNum, COL.URL   + 1).setValue(body.url);
   if (body.icon  !== undefined) sheet.getRange(rowNum, COL.ICON  + 1).setValue(sanitizeText(body.icon, 100));
   if (body.color !== undefined) sheet.getRange(rowNum, COL.COLOR + 1).setValue(sanitizeColor(body.color));
-  if (body.slot  !== undefined) sheet.getRange(rowNum, COL.SLOT  + 1).setValue(parseInt(body.slot));
+  if (newSlot    !== undefined) sheet.getRange(rowNum, COL.SLOT  + 1).setValue(newSlot);
 
   return buildResponse({ status: 'ok', message: '更新しました' });
 }
@@ -246,9 +260,9 @@ function getSheet() {
       .setFontWeight('bold');
     sheet.setFrozenRows(1);
     sheet.setColumnWidths(1, 6, [220, 150, 320, 200, 220, 80]);
-    // 入力規則：スロット番号は 0〜23 の数値
+    // 入力規則：スロット番号は 0〜(TOTAL_SLOTS-1) の数値
     const slotRule = SpreadsheetApp.newDataValidation()
-      .requireNumberBetween(0, 23)
+      .requireNumberBetween(0, TOTAL_SLOTS - 1)
       .setAllowInvalid(false)
       .build();
     sheet.getRange(2, COL.SLOT + 1, 100).setDataValidation(slotRule);
