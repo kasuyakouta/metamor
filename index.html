@@ -1161,6 +1161,15 @@ function _fitGridDebounced(){
 window.addEventListener('resize', _fitGridDebounced);
 window.addEventListener('orientationchange', ()=>setTimeout(fitGridToViewport, 200));
 
+// 起動直後はWebフォントの読み込み完了やモバイルブラウザのアドレスバー収縮等で
+// レイアウトの高さが変動し、fitGridToViewport()の計算結果が数回ズレて
+// アイコンサイズが切り替わって見える（バウンドして見える）ことがある。
+// レイアウトが確定するタイミングで一度だけ再計算し、最終サイズに収束させる。
+if(document.fonts && document.fonts.ready){
+  document.fonts.ready.then(()=>fitGridToViewport()).catch(()=>{});
+}
+setTimeout(fitGridToViewport, 600);
+
 function render(){
   const grid = document.getElementById('icon-grid');
   grid.innerHTML = '';
