@@ -1,9 +1,10 @@
 // ================================================================
 //  Service Worker — メタモル PWA
-//  オフライン時はキャッシュから提供し、起動を高速化する
+//  HTML本体は常に最新を優先（ネットワーク優先）、
+//  その他の静的アセットはキャッシュ優先でオフライン起動を高速化する
 // ================================================================
 
-const CACHE_NAME = 'metamor-v1';
+const CACHE_NAME = 'metamor-v2';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -52,7 +53,26 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // アプリシェル: キャッシュ優先、バックグラウンドで更新
+  // HTML本体（画面遷移 / index.html）はネットワーク優先：
+  // 常に最新版を取得し、オフライン時のみキャッシュにフォールバックする
+  const isHtmlRequest = request.mode === 'navigate' ||
+    request.destination === 'document' ||
+    url.pathname.endsWith('/index.html') ||
+    url.pathname.endsWith('/');
+  if (isHtmlRequest) {
+    event.respondWith(
+      fetch(request, { cache: 'no-store' }).then(res => {
+        if (res.ok) {
+          const clone = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(request, clone));
+        }
+        return res;
+      }).catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // それ以外の静的アセット: キャッシュ優先、バックグラウンドで更新
   event.respondWith(
     caches.match(request).then(cached => {
       const networkFetch = fetch(request).then(res => {

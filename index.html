@@ -2429,6 +2429,31 @@ function toast(msg, type=''){
   el.textContent=msg; el.className=`show ${type}`;
   clearTimeout(ttimer); ttimer=setTimeout(()=>el.className='',2800);
 }
+
+// ═══════════════════════════════════════════════════════
+//  Service Worker 登録（オフライン起動高速化 + 常に最新版を反映）
+//  sw.js側はHTML本体をネットワーク優先で取得するため、通常の起動では
+//  常に最新版が読み込まれる。ここでは「ホーム画面PWAがバックグラウンド
+//  から復帰しただけで実際にはページが再読み込みされない」ケースに備え、
+//  新しいService Workerが制御を引き継いだタイミングで
+//  （編集中でなければ）一度だけ再読み込みして最新コードを反映する。
+// ═══════════════════════════════════════════════════════
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  });
+
+  let _swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    if(_swReloaded) return;
+    if(isAdmin){
+      toast('🔄 新しいバージョンがあります。編集終了後に開き直してください','ok');
+      return;
+    }
+    _swReloaded = true;
+    location.reload();
+  });
+}
 </script>
 </body>
 </html>
