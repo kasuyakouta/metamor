@@ -6,7 +6,7 @@
 
 業務リンクランチャーアプリ(アイコングリッド形式で社内の各種Webアプリへのリンクを管理)。
 
-URL: https://kasuyakouta.github.io/metamor/
+URL: https://skgroup-dx.github.io/metamor/
 
 
 
@@ -18,7 +18,7 @@ URL: https://kasuyakouta.github.io/metamor/
 
 \- スプレッドシートID: 1z-vxdy-MafwMPFHSwv\_4zxGUgOAWq3rEQ\_CeQX\_GNOg
 
-\- Service Worker実装済み(sw.js、Cache First戦略でオフライン起動を高速化)
+\- Service Worker実装・登録済み(sw.js。HTML本体はネットワーク優先で常に最新版を取得し、オフライン時のみキャッシュにフォールバック。アイコン等の静的アセットはCache First戦略でオフライン起動を高速化)
 
 
 
